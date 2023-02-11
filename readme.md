@@ -25,8 +25,7 @@ And, last but not least, Devironment is a tool of the dev, by the dev, and for t
 - PHP 7.2 or higher
 ## Screenshots
 
-![DEVEN](https://user-images.githubusercontent.com/46479689/218275553-c9443c51-401e-4380-8d53-7c4db23aaedc.png)
-
+![devironment](https://user-images.githubusercontent.com/46479689/218276746-46d16fa1-0d13-4deb-b50d-eae6b72affd6.png)
 ## Run Locally
 
 Clone the project
