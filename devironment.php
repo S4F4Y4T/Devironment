@@ -31,9 +31,9 @@ $cmd_lists = [
         'description' => 'List all available commands',
         'action' => 'lists'
     ],
-    'process' => [
+    'vhost' => [
         'description' => 'Proceed to make virtual host',
-        'action' => 'process'
+        'action' => 'vhost'
     ]
 ];
 
@@ -81,7 +81,7 @@ function lists()
     return ['status' => 3, 'message' => 'processing...'];
 }
 
-function process()
+function vhost()
 {
     function is_duplicate($name){
         if(file_exists('/etc/apache2/sites-available/'.$name.'.vh.conf')){
