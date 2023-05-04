@@ -35,9 +35,17 @@ $cmd_lists = [
         'description' => 'Proceed to make virtual host',
         'action' => 'vhost'
     ],
-    'lamp' => [
-        'description' => 'Install Apache,PHP,Mysql',
-        'action' => 'lamp'
+    'mysql' => [
+        'description' => 'Install Mysql',
+        'action' => 'mysql'
+    ],
+    'apache' => [
+        'description' => 'Install Apache',
+        'action' => 'apache'
+    ],
+    'php' => [
+        'description' => 'Install PHP',
+        'action' => 'php'
     ]
 ];
 
