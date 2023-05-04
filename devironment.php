@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 
-$appName = "Ubuntu Vhost";
+$appName = "Devironment";
 $version = "1.1.0";
 $author = "S4F4Y4T";
 
@@ -34,6 +34,10 @@ $cmd_lists = [
     'vhost' => [
         'description' => 'Proceed to make virtual host',
         'action' => 'vhost'
+    ],
+    'lamp' => [
+        'description' => 'Install Apache,PHP,Mysql',
+        'action' => 'lamp'
     ]
 ];
 
@@ -177,6 +181,62 @@ function vhost()
     shell_exec($command);// create virtual host configuration and enable apache2 site and restart apache2
 
     return ['status' => 1, 'message' => 'Vhost generated successfully. Open http://'.$project_name.'.vh'];
+}
+
+function apache(){
+    $command_list = [
+                        'sudo apt-get update',
+                        'sudo apt-get install apache2',
+                        'ufw allow in "Apache"',
+                        'sudo systemctl restart apache2',
+                    ];
+
+    $command = implode(';', $command_list);
+    shell_exec($command);
+
+    return ['status' => 3, 'message' => 'Apache installed successfully. Open http://localhost'];
+}
+
+function php(){
+    $command_list = [
+        'sudo apt-get update',
+        'sudo apt-get install php libapache2-mod-php php-mysql',
+        'sudo systemctl restart apache2',
+    ];
+
+    $command = implode(';', $command_list);
+    shell_exec($command);
+
+    return ['status' => 3, 'message' => 'PHP installed successfully.'];
+}
+
+function mysql(){
+
+    $command_list = [
+        'sudo apt-get update',
+        'sudo apt install mysql-server',
+    ];
+
+    $command = implode(';', $command_list);
+    shell_exec($command);
+
+    echo "Enter your mysql password: ";
+    $password = trim(fgets(STDIN));
+
+    $conn = new mysqli('localhost','root','');
+    $conn->query("SET PASSWORD FOR root@localhost = PASSWORD(".$password.");");
+    $conn->query("FLUSH PRIVILEGES;");
+    $conn->close();
+
+    $command_list = [
+        'sudo mysql_secure_installation --yes',
+        'sudo systemctl restart apache2',
+    ];
+
+    $command = implode(';', $command_list);
+    shell_exec($command);
+
+    return ['status' => 3, 'message' => 'MYSQL installed successfully.'];
 }
 
 switch ($logic['status']) {
