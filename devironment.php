@@ -32,12 +32,8 @@ $cmd_lists = [
         'action' => 'lists'
     ],
     'vhost' => [
-        'description' => 'Proceed to make virtual host',
+        'description' => 'Proceed to make virtual host, e.g: vhost [project name] [directory]',
         'action' => 'vhost'
-    ],
-    'mysql' => [
-        'description' => 'Install Mysql',
-        'action' => 'mysql'
     ],
     'apache' => [
         'description' => 'Install Apache',
@@ -54,90 +50,124 @@ echo PHP_EOL;
 echo "Enter command 'list' to see all the available commands". PHP_EOL;
 echo PHP_EOL;
 
-$logic = ['status' => 3, 'message' => 'processing...'];
+$logic = ['status' => 3, 'message' => ''];
 while ($logic['status'] === 3)
 {
+    if(!empty($logic['message'])){
+        if($logic['type'] === 'success'){
+            echo "\033[32m".$logic['message']."\033[0m" . PHP_EOL;
+        }
+    }
     echo "Enter Command: ";
-    $command = trim(fgets(STDIN));
+    $command_input = trim(fgets(STDIN)); // Read the command input from user
 
-    if(array_key_exists($command, $cmd_lists)) {
+    $commands = explode(" ", $command_input); // Explode the command by spaces
 
-        $logic = $cmd_lists[$command]['action']();
+    $action = $commands[0]; // Get the first index as the command
+
+    $cmd_opt = array_slice($commands, 1); // Get the remaining parts as arguments in an array
+
+    if(array_key_exists($action, $cmd_lists)) {
+
+        $logic = $cmd_lists[$action]['action'](...$cmd_opt);
 
     } else {
         echo "Command not found! Use 'list' command to see all available command" . PHP_EOL;
+        $logic = ['status' => 3, 'message' => ''];
     }
+
 }
 
 //all actions function
-function version()
+function version(): array
 {
     global $version;
     echo $version. PHP_EOL;
 
-    return ['status' => 3, 'message' => 'processing...'];
+    return ['status' => 3, 'message' => ''];
 }
 
-function kill()
+function kill(): array
 {
     return ['status' => 0, 'message' => 'Exiting Program...'];
 }
 
-function lists()
+function lists(): array
 {
     global $cmd_lists;
     foreach ($cmd_lists as $key => $val){
         echo '  []'.$key .' - '.$val['description'] . PHP_EOL;
     }
 
-    return ['status' => 3, 'message' => 'processing...'];
+    return ['status' => 3, 'message' => ''];
 }
 
-function vhost()
+function vhost($project_name = "", $dir = "")
 {
-    function is_duplicate($name){
-        if(file_exists('/etc/apache2/sites-available/'.$name.'.vh.conf')){
-            return true;
-        }
+    $error = false;
 
-        return false;
+    if (!function_exists('is_duplicate')) {
+        function is_duplicate($name): bool
+        {
+            if(file_exists('/etc/apache2/sites-available/'.$name.'.conf')){
+                return true;
+            }
+
+            return false;
+        }
     }
 
     //take input for the project name of the vhost and validate space and special characters
-    $project_name = "";
-    while (!preg_match('/^[a-zA-Z0-9]+$/', $project_name) || is_duplicate($project_name))
-    {
-        echo "Enter your Project Name: ";
-        $project_name = trim(fgets(STDIN));
-
-        if(!preg_match('/^[a-zA-Z0-9]+$/', $project_name)){
-            echo "Can't contain space or any special character". PHP_EOL;
+    while (empty(trim($project_name)) || is_duplicate($project_name) || !preg_match('/^[a-zA-Z0-9.]+$/', $project_name)) {
+        if(empty($project_name) || $error) {
+            echo "Enter your Project Name: ";
+            $project_name = trim(fgets(STDIN));
         }
 
-        if(is_duplicate($project_name)){
-            echo "This vhost already exist in your system". PHP_EOL;
+        if (empty(trim($project_name))) {
+            echo "Project name cannot be empty" . PHP_EOL;
+            $error = true;
+        } elseif (!preg_match('/^[a-zA-Z0-9.]+$/', $project_name)) {
+            echo "Can't contain spaces or any special characters except for a period (.)" . PHP_EOL;
+            $error = true;
+        }elseif (is_duplicate($project_name)) {
+            echo "This vhost already exists in your system" . PHP_EOL;
+            $error = true;
         }
-
     }
 
+    $error = false;
+
 //take directory input and validate
-    $dir = "";
-    while (!is_dir($dir))
+    while (empty(trim($dir)) || !is_dir($dir) || is_dir($dir.$project_name))
     {
-        echo "Enter Directory Path: ";
-        $dir = trim(fgets(STDIN));
+        if(empty(trim($dir)) || $error){
+            echo "Enter Directory Path: ";
+            $dir = trim(fgets(STDIN));
+        }
+
+        //validate if / include at the end of the directory location, if not then append
+        if (substr($dir, -1) != '/') {
+            $dir .= '/';
+        }
 
         if(!is_dir($dir)){
             echo "Invalid directory". PHP_EOL;
+            $error = true;
         }
+
+        if(is_dir($dir.$project_name)){
+            echo "Project folder already exist in this directory". PHP_EOL;
+            $error = true;
+        }
+
     }
 
-    //validate if / include at the end of the directory location, if not then append
-    if (substr($dir, -1) != '/') {
-        $dir .= '/';
-    }
+    echo "Directory validated...". PHP_EOL;
 
-    echo "Processing...". PHP_EOL;
+
+
+    echo "Initializing...". PHP_EOL;
 
     //make the project directory
     if (!file_exists($dir.$project_name)) {
@@ -160,35 +190,40 @@ function vhost()
         chown($dir.$project_name."/index.html", get_current_user());
     }
 
-    $vhost = fopen('/etc/apache2/sites-available/'.$project_name.'.vh.conf', "w");
+    $vhost = fopen('/etc/apache2/sites-available/'.$project_name.'.conf', "w");
     $conf = '
-    <VirtualHost '.$project_name.'.vh:80>
+    <VirtualHost '.$project_name.':80>
         <Directory '.$dir.$project_name.'>
             Options Indexes FollowSymLinks MultiViews
             AllowOverride All
             Require all granted
         </Directory>
-        ServerAdmin admin@'.$project_name.'.vh
-        ServerName '.$project_name.'.vh
-        ServerAlias www.'.$project_name.'.vh
+        ServerAdmin admin@'.$project_name.'
+        ServerName '.$project_name.'
+        ServerAlias www.'.$project_name.'
         DocumentRoot '.$dir.$project_name.'
         ErrorLog ${APACHE_LOG_DIR}/error.log
     </VirtualHost>';
     fwrite($vhost, $conf);
     fclose($vhost);
 
+    echo "Apache config created...". PHP_EOL;
+
     $hosts = "/etc/hosts";
     // Read the contents of the file into a string
     $file_contents = file_get_contents($hosts);
     // Prepend the new line to the existing contents
-    $new_record = "127.0.0.1	".$project_name.".vh" . PHP_EOL . $file_contents;
+    $new_record = "127.0.0.1	".$project_name . PHP_EOL . $file_contents;
     // Write the new contents back to the file
     file_put_contents($hosts, $new_record);
 
-    $command = "a2ensite ".$project_name.".vh.conf; systemctl reload apache2";
+    echo "Added to host...". PHP_EOL;
+    echo "Restarting server...". PHP_EOL;
+
+    $command = "a2ensite ".$project_name.".conf; systemctl reload apache2";
     shell_exec($command);// create virtual host configuration and enable apache2 site and restart apache2
 
-    return ['status' => 1, 'message' => 'Vhost generated successfully. Open http://'.$project_name.'.vh'];
+    return ['status' => 3, 'type' => 'success', 'message' => 'Vhost generated successfully. Open http://'.$project_name];
 }
 
 function apache(){
@@ -202,7 +237,7 @@ function apache(){
     $command = implode(';', $command_list);
     shell_exec($command);
 
-    return ['status' => 3, 'message' => 'Apache installed successfully. Open http://localhost'];
+    return ['status' => 1, 'message' => 'Apache installed successfully. Open http://localhost'];
 }
 
 function php(){
@@ -216,35 +251,6 @@ function php(){
     shell_exec($command);
 
     return ['status' => 3, 'message' => 'PHP installed successfully.'];
-}
-
-function mysql(){
-
-    $command_list = [
-        'sudo apt-get update',
-        'sudo apt install mysql-server',
-    ];
-
-    $command = implode(';', $command_list);
-    shell_exec($command);
-
-    echo "Enter your mysql password: ";
-    $password = trim(fgets(STDIN));
-
-    $conn = new mysqli('localhost','root','');
-    $conn->query("SET PASSWORD FOR root@localhost = PASSWORD(".$password.");");
-    $conn->query("FLUSH PRIVILEGES;");
-    $conn->close();
-
-    $command_list = [
-        'sudo mysql_secure_installation --yes',
-        'sudo systemctl restart apache2',
-    ];
-
-    $command = implode(';', $command_list);
-    shell_exec($command);
-
-    return ['status' => 3, 'message' => 'MYSQL installed successfully.'];
 }
 
 switch ($logic['status']) {
