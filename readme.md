@@ -23,6 +23,8 @@ And, last but not least, Devironment is a tool of the dev, by the dev, and for t
 
 - Apache2
 - PHP 7.2 or higher
+- Ubuntu
+- Root User
 ## Screenshots
 
 ![devironment](https://user-images.githubusercontent.com/46479689/218276746-46d16fa1-0d13-4deb-b50d-eae6b72affd6.png)
