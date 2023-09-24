@@ -2,7 +2,7 @@
 <?php
 
 $appName = "Devironment";
-$version = "1.1.0";
+$version = "1.3.0";
 $author = "S4F4Y4T";
 
 echo "    
@@ -39,9 +39,9 @@ $cmd_lists = [
         'description' => 'Install Apache',
         'action' => 'apache'
     ],
-    'php' => [
-        'description' => 'Install PHP',
-        'action' => 'php'
+    'mysqldump' => [
+        'description' => 'Backup Mysql Dump Ex: mysqldump [username] [password] [dbname] [backupfile] --optional [host] --optional',
+        'action' => 'mysqldump'
     ]
 ];
 
@@ -240,17 +240,65 @@ function apache(){
     return ['status' => 1, 'message' => 'Apache installed successfully. Open http://localhost'];
 }
 
-function php(){
-    $command_list = [
-        'sudo apt-get update',
-        'sudo apt-get install php libapache2-mod-php php-mysql',
-        'sudo systemctl restart apache2',
-    ];
+function mysqldump($username = "", $password = "", $db = "")
+{
+    $dbConfig = __DIR__ . '/.db.cnf';
 
-    $command = implode(';', $command_list);
-    shell_exec($command);
+    // Check if the option file exists
+    if (file_exists($dbConfig)) {
+    
+        // Option file exists, update the content
+        $content = "[client]\nuser=$username\npassword=$password\n";
+        file_put_contents($dbConfig, $content);
+        echo "DB Config updated.\n" . PHP_EOL;
+        
+    } else {
+    
+        // Option file doesn't exist, create a new one
+        $content = "[client]\nuser=$username\npassword=$password\n";
+        if (file_put_contents($dbConfig, $content) !== false) {
+        
+            chmod($conf, 0600); // Set permissions to make it readable and writable only by the owner
+            echo "DB Config created.\n". PHP_EOL;
+            
+        } else {
+        
+            echo "Unable to write content to the file.";
+            return ['status' => 3, 'type' => 'error', 'message' => 'Unable to write content to the file.'];
+        }
+        
+    }
 
-    return ['status' => 3, 'message' => 'PHP installed successfully.'];
+    exec('mysql --defaults-extra-file=' . $dbConfig . ' -e "SELECT 1"', $output, $return_var);
+
+    // Check if the command was successful
+    if ($return_var !== 0) 
+    {
+        // Command failed, and $output may contain error messages
+        return ['status' => 3, 'type' => 'error', 'message' => 'Invalid DB Config '];
+   }
+
+
+    $downloadDir = '/home/'.get_current_user().'/Downloads/';
+    if (!$downloadDir) {
+        echo "Download directory not found.";
+        return ['status' => 3, 'type' => 'error', 'message' => 'Download directory not found.'];
+    }
+
+    $command = 'mysqldump --defaults-extra-file=' . $dbConfig . ' ' . $db . ' > ' . $downloadDir . $db . '~' . date("Y-m-d") . '.sql';
+
+    exec($command, $output, $return_var);
+
+    // Check if the command was successful
+    if ($return_var === 0) {
+    
+        return ['status' => 3, 'type' => 'success', 'message' => 'Backup Successful'];
+        
+    } else {
+        // Command failed, and $output may contain error messages
+        $messages = implode("\n", $output);
+        return ['status' => 3, 'type' => 'error', 'message' => 'Backup Failed: ' . $messages];
+   }
 }
 
 switch ($logic['status']) {
