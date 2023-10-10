@@ -2,7 +2,7 @@
 <?php
 
 $appName = "Devironment";
-$version = "1.3.0";
+$version = "2.4.0";
 $author = "S4F4Y4T";
 
 echo "    
@@ -32,7 +32,7 @@ $cmd_lists = [
         'action' => 'lists'
     ],
     'vhost' => [
-        'description' => 'Proceed to make virtual host, e.g: vhost [project name] [directory]',
+        'description' => 'Proceed to make virtual host, e.g: vhost [domain] [project name] [directory]',
         'action' => 'vhost'
     ],
     'apache' => [
@@ -47,33 +47,46 @@ $cmd_lists = [
 
 //instruction to see the available commands of program
 echo PHP_EOL;
-echo "Enter command 'list' to see all the available commands". PHP_EOL;
+echo "Enter command 'list' to see all the available commands" . PHP_EOL;
 echo PHP_EOL;
 
 $logic = ['status' => 3, 'message' => ''];
-while ($logic['status'] === 3)
-{
-    if(!empty($logic['message'])){
-        if($logic['type'] === 'success'){
-            echo "\033[32m".$logic['message']."\033[0m" . PHP_EOL;
+while ($logic['status'] === 3) {
+    if (!empty($logic['message'])) {
+        switch ($logic['type']) {
+            case 'success':
+                echo "\033[32m" . $logic['message'] . "\033[0m" . PHP_EOL;
+                break;
+            default:
+                echo "\033[31m" . $logic['message'] . "\033[0m" . PHP_EOL;
+                break;
         }
     }
-    echo "Enter Command: ";
-    $command_input = trim(fgets(STDIN)); // Read the command input from user
 
-    $commands = explode(" ", $command_input); // Explode the command by spaces
+    if (posix_geteuid() !== 0) {
 
-    $action = $commands[0]; // Get the first index as the command
+        $logic = ['status' => 0, 'type' => 'error', 'message' => 'This script requires superuser (sudo) privileges.'];
 
-    $cmd_opt = array_slice($commands, 1); // Get the remaining parts as arguments in an array
+    }else{
 
-    if(array_key_exists($action, $cmd_lists)) {
+        echo "Enter Command: ";
+        $command_input = trim(fgets(STDIN)); // Read the command input from user
 
-        $logic = $cmd_lists[$action]['action'](...$cmd_opt);
+        $commands = explode(" ", $command_input); // Explode the command by spaces
 
-    } else {
-        echo "Command not found! Use 'list' command to see all available command" . PHP_EOL;
-        $logic = ['status' => 3, 'message' => ''];
+        $action = $commands[0]; // Get the first index as the command
+
+        $cmd_opt = array_slice($commands, 1); // Get the remaining parts as arguments in an array
+
+        if (array_key_exists($action, $cmd_lists)) {
+
+            $logic = $cmd_lists[$action]['action'](...$cmd_opt);
+
+        } else {
+            echo "Command not found! Use 'list' command to see all available command" . PHP_EOL;
+            $logic = ['status' => 3, 'message' => ''];
+        }
+
     }
 
 }
@@ -82,7 +95,7 @@ while ($logic['status'] === 3)
 function version(): array
 {
     global $version;
-    echo $version. PHP_EOL;
+    echo $version . PHP_EOL;
 
     return ['status' => 3, 'message' => ''];
 }
@@ -95,149 +108,44 @@ function kill(): array
 function lists(): array
 {
     global $cmd_lists;
-    foreach ($cmd_lists as $key => $val){
-        echo '  []'.$key .' - '.$val['description'] . PHP_EOL;
+    foreach ($cmd_lists as $key => $val) {
+        echo '  []' . $key . ' - ' . $val['description'] . PHP_EOL;
     }
 
     return ['status' => 3, 'message' => ''];
 }
 
-function vhost($project_name = "", $dir = "")
+function vhost($domain = "", $project_name = "" , $dir = "")
 {
-    $error = false;
+    require_once 'vhost/init.php';
 
-    if (!function_exists('is_duplicate')) {
-        function is_duplicate($name): bool
-        {
-            if(file_exists('/etc/apache2/sites-available/'.$name.'.conf')){
-                return true;
-            }
+    $apacheStatus = shell_exec('systemctl is-active apache2'); // Ubuntu/Debian-specific command
 
-            return false;
-        }
+    if (trim($apacheStatus) !== 'active') {
+        return ['status' => 3, 'type' => 'error', 'message' => 'Apache service is not active.'];
     }
 
-    //take input for the project name of the vhost and validate space and special characters
-    while (empty(trim($project_name)) || is_duplicate($project_name) || !preg_match('/^[a-zA-Z0-9.]+$/', $project_name)) {
-        if(empty($project_name) || $error) {
-            echo "Enter your Project Name: ";
-            $project_name = trim(fgets(STDIN));
-        }
-
-        if (empty(trim($project_name))) {
-            echo "Project name cannot be empty" . PHP_EOL;
-            $error = true;
-        } elseif (!preg_match('/^[a-zA-Z0-9.]+$/', $project_name)) {
-            echo "Can't contain spaces or any special characters except for a period (.)" . PHP_EOL;
-            $error = true;
-        }elseif (is_duplicate($project_name)) {
-            echo "This vhost already exists in your system" . PHP_EOL;
-            $error = true;
-        }
-    }
-
-    $error = false;
-
-//take directory input and validate
-    while (empty(trim($dir)) || !is_dir($dir) || is_dir($dir.$project_name))
-    {
-        if(empty(trim($dir)) || $error){
-            echo "Enter Directory Path: ";
-            $dir = trim(fgets(STDIN));
-        }
-
-        //validate if / include at the end of the directory location, if not then append
-        if (substr($dir, -1) != '/') {
-            $dir .= '/';
-        }
-
-        if(!is_dir($dir)){
-            echo "Invalid directory". PHP_EOL;
-            $error = true;
-        }
-
-        if(is_dir($dir.$project_name)){
-            echo "Project folder already exist in this directory". PHP_EOL;
-            $error = true;
-        }
-
-    }
-
-    echo "Directory validated...". PHP_EOL;
-
-
-
-    echo "Initializing...". PHP_EOL;
-
-    //make the project directory
-    if (!file_exists($dir.$project_name)) {
-        mkdir($dir.$project_name, 0775, true);
-        chown($dir.$project_name, get_current_user());
-
-        $index = fopen($dir.$project_name."/index.html", "w");
-        $html = "<!DOCTYPE html>
-                <html>
-                    <head>
-                      <meta charset='UTF-8'>
-                      <title>Powered BY VHOST</title>
-                    </head>
-                    <body>
-                      This site was generated by VHOST
-                    </body>
-                </html>";
-        fwrite($index, $html);
-        fclose($index);
-        chown($dir.$project_name."/index.html", get_current_user());
-    }
-
-    $vhost = fopen('/etc/apache2/sites-available/'.$project_name.'.conf', "w");
-    $conf = '
-    <VirtualHost '.$project_name.':80>
-        <Directory '.$dir.$project_name.'>
-            Options Indexes FollowSymLinks MultiViews
-            AllowOverride All
-            Require all granted
-        </Directory>
-        ServerAdmin admin@'.$project_name.'
-        ServerName '.$project_name.'
-        ServerAlias www.'.$project_name.'
-        DocumentRoot '.$dir.$project_name.'
-        ErrorLog ${APACHE_LOG_DIR}/error.log
-    </VirtualHost>';
-    fwrite($vhost, $conf);
-    fclose($vhost);
-
-    echo "Apache config created...". PHP_EOL;
-
-    $hosts = "/etc/hosts";
-    // Read the contents of the file into a string
-    $file_contents = file_get_contents($hosts);
-    // Prepend the new line to the existing contents
-    $new_record = "127.0.0.1	".$project_name . PHP_EOL . $file_contents;
-    // Write the new contents back to the file
-    file_put_contents($hosts, $new_record);
-
-    echo "Added to host...". PHP_EOL;
-    echo "Restarting server...". PHP_EOL;
-
-    $command = "a2ensite ".$project_name.".conf; systemctl reload apache2";
-    shell_exec($command);// create virtual host configuration and enable apache2 site and restart apache2
-
-    return ['status' => 3, 'type' => 'success', 'message' => 'Vhost generated successfully. Open http://'.$project_name];
+    $init = new Init($domain = "", $project_name = "" , $dir = "");
+    return $init->make();
 }
 
-function apache(){
+function apache()
+{
+    if (posix_geteuid() !== 0) {
+        return ['status' => 3, 'type' => 'error', 'message' => 'This script requires superuser (sudo) privileges. '];
+    }
+
     $command_list = [
-                        'sudo apt-get update',
-                        'sudo apt-get install apache2',
-                        'ufw allow in "Apache"',
-                        'sudo systemctl restart apache2',
-                    ];
+        'sudo apt-get update',
+        'sudo apt-get install apache2',
+        'ufw allow in "Apache"',
+        'sudo systemctl restart apache2',
+    ];
 
     $command = implode(';', $command_list);
     shell_exec($command);
 
-    return ['status' => 1, 'message' => 'Apache installed successfully. Open http://localhost'];
+    return ['status' => 1, 'message' => 'Apache installed successfully. Go to http://localhost'];
 }
 
 function mysqldump($username = "", $password = "", $db = "")
@@ -246,40 +154,39 @@ function mysqldump($username = "", $password = "", $db = "")
 
     // Check if the option file exists
     if (file_exists($dbConfig)) {
-    
+
         // Option file exists, update the content
         $content = "[client]\nuser=$username\npassword=$password\n";
         file_put_contents($dbConfig, $content);
         echo "DB Config updated.\n" . PHP_EOL;
-        
+
     } else {
-    
+
         // Option file doesn't exist, create a new one
         $content = "[client]\nuser=$username\npassword=$password\n";
         if (file_put_contents($dbConfig, $content) !== false) {
-        
-            chmod($conf, 0600); // Set permissions to make it readable and writable only by the owner
-            echo "DB Config created.\n". PHP_EOL;
-            
+
+            chmod($dbConfig, 0600); // Set permissions to make it readable and writable only by the owner
+            echo "DB Config created.\n" . PHP_EOL;
+
         } else {
-        
+
             echo "Unable to write content to the file.";
             return ['status' => 3, 'type' => 'error', 'message' => 'Unable to write content to the file.'];
         }
-        
+
     }
 
     exec('mysql --defaults-extra-file=' . $dbConfig . ' -e "SELECT 1"', $output, $return_var);
 
     // Check if the command was successful
-    if ($return_var !== 0) 
-    {
+    if ($return_var !== 0) {
         // Command failed, and $output may contain error messages
         return ['status' => 3, 'type' => 'error', 'message' => 'Invalid DB Config '];
-   }
+    }
 
 
-    $downloadDir = '/home/'.get_current_user().'/Downloads/';
+    $downloadDir = '/home/' . get_current_user() . '/Downloads/';
     if (!$downloadDir) {
         echo "Download directory not found.";
         return ['status' => 3, 'type' => 'error', 'message' => 'Download directory not found.'];
@@ -291,22 +198,22 @@ function mysqldump($username = "", $password = "", $db = "")
 
     // Check if the command was successful
     if ($return_var === 0) {
-    
+
         return ['status' => 3, 'type' => 'success', 'message' => 'Backup Successful'];
-        
+
     } else {
         // Command failed, and $output may contain error messages
         $messages = implode("\n", $output);
         return ['status' => 3, 'type' => 'error', 'message' => 'Backup Failed: ' . $messages];
-   }
+    }
 }
 
 switch ($logic['status']) {
     case 1:
-        echo "\033[32m".$logic['message']."\033[0m" . PHP_EOL;
+        echo "\033[32m" . $logic['message'] . "\033[0m" . PHP_EOL;
         break;
     case 0:
-        echo $logic['message'] . PHP_EOL;
+        echo "\033[31m" . $logic['message'] . "\033[0m" . PHP_EOL;
         break;
     default:
         echo "Exiting program..." . PHP_EOL;
