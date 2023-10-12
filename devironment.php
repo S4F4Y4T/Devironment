@@ -113,6 +113,7 @@ function lists(): array
     foreach ($cmd_lists as $key => $val) {
         echo '  [] ' . $key . ' - ' . $val['description'] . PHP_EOL;
     }
+    echo PHP_EOL;
 
     return ['status' => 3, 'message' => ''];
 }
@@ -132,10 +133,11 @@ function vhost(string $action = "", string $domain = "", string $project_name = 
 
     if(empty($action) && !empty($options)){
         echo PHP_EOL;
-        echo "Action you want to perform?" . PHP_EOL;
+        echo "Which action you want to perform?" . PHP_EOL;
         foreach ($options as $option){
-            echo "  ".$option['action']."- ".$option['description']. PHP_EOL;
+            echo "      []".$option['action']."- ".$option['description']. PHP_EOL;
         }
+        echo PHP_EOL;
     }
 
     //take action user wants to perform

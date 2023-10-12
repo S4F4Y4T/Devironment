@@ -284,6 +284,7 @@ class Init{
                 }
             }
         }
+        echo PHP_EOL;
 
         return ['status' => 3, 'type' => '', 'message' => ''];
     }
@@ -306,7 +307,7 @@ class Init{
 
         } elseif (strpos($output, "Site $this->domain already enabled.") !== false){
 
-            $message = $this->domain . " already enabled.";
+            $message = $this->domain . " already enabled";
 
         } else {
 
