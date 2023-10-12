@@ -1,16 +1,26 @@
 <?php
 class validation{
 
-    function is_duplicate($project): bool
+    function duplicate_domain($conf = ""): bool
     {
-        if(empty($project)){
-            return $project;
-        }
-
-        if(file_exists('/etc/apache2/sites-available/'.$project.'.conf')){
+        if(file_exists('/etc/apache2/sites-available/'.$conf.'.conf')){
             return true;
         }
 
         return false;
+    }
+
+    function is_valid($conf = ""): bool
+    {
+        if(file_exists('/etc/apache2/sites-available/'.$conf.'.conf')){
+            return true;
+        }
+
+        return false;
+    }
+
+    public function validate_option(string $action, array $options) : bool
+    {
+        return in_array($action, array_column($options, 'action'));
     }
 }
