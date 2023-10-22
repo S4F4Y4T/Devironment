@@ -1,9 +1,14 @@
-#!/usr/bin/php
+#!/usr/bin/env php
+
 <?php
 
+//require_once '../vhost/init.php';
+
 $appName = "Devironment";
-$version = "2.4.0";
+$version = "3.0.0";
 $author = "S4F4Y4T";
+$repository = 'https://github.com/S4F4Y4T/Devironment'; // url of original git repo
+$branch = 'main'; // name of the master branch
 
 echo "    
 ________   _______________   ____.___ __________ ________    _______      _____   ___________ _______ ___________ 
@@ -16,36 +21,54 @@ ________   _______________   ____.___ __________ ________    _______      _____ 
 echo PHP_EOL;
 echo "# Version: " . $version . PHP_EOL;
 echo "# Author: " . $author . PHP_EOL;
-echo PHP_EOL;
+echo "# Repository: " . $repository . PHP_EOL;
 
+$sudo = sudo(); //validate if user has sudo privileges
+
+//Handle script update validation
+$status = status();
 $logic = ['status' => 3, 'message' => ''];
-if (posix_geteuid() !== 0) {
-    $logic = ['status' => 0, 'type' => 'error', 'message' => 'This script requires superuser (sudo) privileges.'];
-}else{
-    //instruction to see the available commands of program
-    echo PHP_EOL;
-    echo "Enter command 'list' to see all the available commands" . PHP_EOL;
-    echo PHP_EOL;
+if(isGit()) {
+    if ($status['type'] === 'error') {
+        $logic['type'] = 'error';
+        $logic['message'] = 'There is a new update available';
+    }
 }
+
+//instruction to see the available commands of program
+echo PHP_EOL;
+echo "Enter command 'help' to see all the available commands" . PHP_EOL;
 
 //all available commands and there actions
 $cmd_lists = [
+    'help' => [
+        'description' => 'List all available commands',
+        'action' => 'help'
+    ],
     '--v' => [
         'description' => 'View current version of the script',
         'action' => 'version'
     ],
+    'status' => [
+        'description' => 'Check for new update',
+        'action' => 'status'
+    ],
+    'sync' => [
+        'description' => 'Update to latest version',
+        'action' => 'sync'
+    ],
+    'ping' => [
+        'description' => 'Check Your Internet Connection',
+        'action' => 'ping'
+    ],
+    'vhost' => [
+        'description' => 'Manage Virtual Hosts. EX: vhost [action] [domain] [project name] [directory]',
+        'action' => 'vhost'
+    ],
     'kill' => [
         'description' => 'Exit the program',
         'action' => 'kill'
-    ],
-    'list' => [
-        'description' => 'List all available commands',
-        'action' => 'lists'
-    ],
-    'vhost' => [
-        'description' => 'Manage Virtual Hosts. EX: vhost [action] [domain] [project name] --optional [directory] --optional',
-        'action' => 'vhost'
-    ],
+    ]
 //    'apache' => [
 //        'description' => 'Install Apache',
 //        'action' => 'apache'
@@ -59,7 +82,7 @@ $cmd_lists = [
 while ($logic['status'] === 3) {
 
     if (!empty($logic['message'])) {
-        switch ($logic['type']) {
+        switch ($logic['type'] ?? "") {
             case 'success':
                 echo "\033[32m" . $logic['message'] . "\033[0m" . PHP_EOL;
                 break;
@@ -72,6 +95,7 @@ while ($logic['status'] === 3) {
         }
     }
 
+    echo PHP_EOL;
     echo "Enter Command: ";
     $command_input = trim(fgets(STDIN)); // Read the command input from user
 
@@ -86,19 +110,129 @@ while ($logic['status'] === 3) {
         $logic = $cmd_lists[$action]['action'](...$cmd_opt);
 
     } else {
-        echo "Command not found! Use 'list' command to see all available command" . PHP_EOL;
-        $logic = ['status' => 3, 'message' => ''];
+        echo "Command '$action' not found! Use 'help' command to see all available commands." . PHP_EOL;
+        $logic = ['status' => 3];
     }
 
+}
+
+function getAction(string $action, array $options)
+{
+    if(empty($action) && !empty($options)){
+        echo PHP_EOL;
+        echo "Which action you want to perform?" . PHP_EOL;
+        foreach ($options as $option){
+            echo "      [".$option['action-id']."]".$option['label']."- ".$option['description']. PHP_EOL;
+        }
+        echo PHP_EOL;
+    }
+
+    //take action user wants to perform
+    while (!(in_array($action, array_column($options, 'action')) || in_array($action, array_column($options, 'action-id')))) {
+
+        if(!empty($action)){
+            echo "Error: Invalid action" . PHP_EOL;
+        }
+
+        echo "Choose your action: ";
+        $action = strtolower(trim(fgets(STDIN)));
+    }
+
+    return $action;
+}
+
+function isGit() {
+    $parentDirectory = dirname(__DIR__); // Get the parent directory of the current working directory
+    $command = "git -C $parentDirectory rev-parse --is-inside-work-tree 2>&1";
+    $output = shell_exec($command);
+
+    // Check the output of the command
+    return trim($output) === "true";
 }
 
 //all actions function
 function version(): array
 {
     global $version;
-    echo $version . PHP_EOL;
 
-    return ['status' => 3, 'message' => ''];
+    return ['status' => 3, 'type' => 'success', 'message' => $version];
+}
+
+function status(): array
+{
+    global $repository;
+    global $branch;
+
+    if(!isGit()){
+        return ['status' => 3, 'type' => 'error', 'message' => "Script repository not found."];
+    }
+
+    echo "Checking for new updates...". PHP_EOL;
+
+    // Get the latest commit SHA from the remote repository
+    $latestRemoteCommit = trim(shell_exec("git ls-remote $repository $branch"));
+
+    // Get the local commit SHA of the branch
+    $localCommit = trim(shell_exec("git rev-parse $branch"));
+
+    if ($latestRemoteCommit[0] ?? "" === $localCommit) {
+        return ['status' => 3, 'type' => 'success', 'message' => "Up to date! Nothing to update."];
+    }
+
+    return ['status' => 3, 'type' => 'error', 'message' => "There is a new version available."];
+}
+
+function sync(): array
+{
+    global $repository;
+    global $branch;
+    global $status;
+
+    if(!isGit()){
+        return ['status' => 3, 'type' => 'error', 'message' => "Script repository not found."];
+    }
+
+    if($status['type'] === 'success'){
+        return ['status' => 3, 'type' => 'error', 'message' => "Up to date! Nothing to update."];
+    }
+
+    echo "Processing...". PHP_EOL;
+
+    // Execute a `git pull` command to fetch and apply the latest changes from the remote repository
+    $gitPullOutput = shell_exec("git pull $repository $branch");
+
+    if (strpos($gitPullOutput, 'Already up to date') !== false) {
+        $response = ['status' => 3, 'message' => "Already up to date."];
+    } elseif (strpos($gitPullOutput, 'Updating') !== false) {
+        $response = ['status' => 3, 'type' => 'success', 'message' => "Updated successfully! Restart to make the changes."];
+    }else{
+        $response = ['status' => 3, 'type' => 'error', 'message' => "Something went wrong."];
+    }
+
+    return $response;
+}
+
+function sudo()
+{
+    if (posix_geteuid() !== 0)
+    {
+        return ['status' => 0, 'type' => 'error', 'message' => 'This user do not has superuser (sudo) privileges.'];
+    }
+
+    return ['status' => 3, 'type' => 'success', 'message' => 'This user has superuser (sudo) privileges.'];
+}
+
+function ping(): array
+{
+    $ipAddress = '8.8.8.8'; // Google Public DNS
+
+    exec("ping -c 1 -W 2 $ipAddress", $output, $exitCode);
+
+    if($exitCode === 0){
+        return ['status' => 3, 'type' => 'success', 'message' => 'Internet is available'];
+    }
+
+    return ['status' => 3, 'type' => 'error', 'message' => 'Internet is not available'];
 }
 
 function kill(): array
@@ -107,20 +241,23 @@ function kill(): array
     return ['status' => 0, 'message' => ''];
 }
 
-function lists(): array
+function help(): array
 {
     global $cmd_lists;
     foreach ($cmd_lists as $key => $val) {
         echo '  [] ' . $key . ' - ' . $val['description'] . PHP_EOL;
     }
-    echo PHP_EOL;
 
     return ['status' => 3, 'message' => ''];
 }
 
 function vhost(string $action = "", string $domain = "", string $project_name = "" , string $dir = "")
 {
-    require_once 'vhost/init.php';
+    global $sudo;
+
+    if($sudo['status'] === 0){
+        return ['status' => 3, 'type' => 'error', 'message' => 'This operation require superuser (sudo) privileges.'];
+    }
 
     // validate if apache is active
     $apacheStatus = shell_exec('systemctl is-active apache2');
@@ -131,36 +268,23 @@ function vhost(string $action = "", string $domain = "", string $project_name = 
     $init = new Init($domain, $project_name , $dir);
     $options = $init->getOptions();
 
-    if(empty($action) && !empty($options)){
-        echo PHP_EOL;
-        echo "Which action you want to perform?" . PHP_EOL;
-        foreach ($options as $option){
-            echo "      []".$option['action']."- ".$option['description']. PHP_EOL;
-        }
-        echo PHP_EOL;
-    }
+    $action = getAction($action, $options); // take user action and validate
 
-    //take action user wants to perform
-    while (!$init->validateOption($action)) {
-
-        echo "Choose your action: ";
-        $action = strtolower(trim(fgets(STDIN)));
-
-        if (!$init->validateOption($action)) {
-            echo "Error: Invalid action" . PHP_EOL;
-        }
-    }
-
+    //call the appropriate method according to user action
     switch ($action) {
         case 'create':
+        case 1:
             $response = $init->create();
             break;
         case 'list':
+        case 2:
             $response = $init->list();
             break;
+        case 3:
         case 'enable':
             $response = $init->enable();
             break;
+        case 4:
         case 'disable':
             $response = $init->disable();
             break;
@@ -170,47 +294,6 @@ function vhost(string $action = "", string $domain = "", string $project_name = 
     }
 
     return $response;
-}
-
-function vlist($domain = "")
-{
-    require_once 'vhost/init.php';
-
-    $apacheStatus = shell_exec('systemctl is-active apache2'); // Ubuntu/Debian-specific command
-
-    if (trim($apacheStatus) !== 'active') {
-        return ['status' => 3, 'type' => 'error', 'message' => 'Apache service is not active.'];
-    }
-
-    $init = new Init($domain);
-    return $init->list();
-}
-
-function vactive($domain = "")
-{
-    require_once 'vhost/init.php';
-
-    $apacheStatus = shell_exec('systemctl is-active apache2'); // Ubuntu/Debian-specific command
-
-    if (trim($apacheStatus) !== 'active') {
-        return ['status' => 3, 'type' => 'error', 'message' => 'Apache service is not active.'];
-    }
-
-    $init = new Init($domain);
-    return $init->active();
-}
-function vInActive($domain = "")
-{
-    require_once 'vhost/init.php';
-
-    $apacheStatus = shell_exec('systemctl is-active apache2'); // Ubuntu/Debian-specific command
-
-    if (trim($apacheStatus) !== 'active') {
-        return ['status' => 3, 'type' => 'error', 'message' => 'Apache service is not active.'];
-    }
-
-    $init = new Init($domain);
-    return $init->inActive();
 }
 
 function apache()
@@ -290,16 +373,11 @@ function mysqldump($username = "", $password = "", $db = "")
 
 switch ($logic['status']) {
     case 1:
-        echo "\033[32m" . $logic['message'] . "\033[0m" . PHP_EOL;
+        echo "\033[32m" . $logic['message'] . "\033[0m" . PHP_EOL. PHP_EOL;
         break;
     case 0:
-        echo "\033[31m" . $logic['message'] . "\033[0m" . PHP_EOL;
+        echo "\033[31m" . $logic['message'] . "\033[0m" . PHP_EOL. PHP_EOL;
         break;
     default:
         echo "Exiting program..." . PHP_EOL;
 }
-
-
-
-
-

@@ -40,7 +40,7 @@ Clone the project
 Go to the project directory
 
 ```bash
-  cd devironment
+  cd devironment.php
 ```
 
 Run the script

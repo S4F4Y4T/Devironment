@@ -18,9 +18,4 @@ class validation{
 
         return false;
     }
-
-    public function validate_option(string $action, array $options) : bool
-    {
-        return in_array($action, array_column($options, 'action'));
-    }
 }

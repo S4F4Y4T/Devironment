@@ -1,4 +1,5 @@
 <?php
+
 require_once 'validation.php';
 
 class Init{
@@ -18,10 +19,10 @@ class Init{
     public function getOptions() : array
     {
         return [
-            ['label' => 'Create', 'description' => 'Create New Virtual Host', 'action' => 'create'],
-            ['label' => 'List', 'description' => 'List virtual hosts on your system', 'action' => 'list'],
-            ['label' => 'Enable', 'description' => 'Enable a inactive host', 'action' => 'enable'],
-            ['label' => 'Disable', 'description' => 'Disable a active host', 'action' => 'disable']
+            ['action-id' => 1, 'action' => 'create', 'label' => 'Create', 'description' => 'Create New Virtual Host'],
+            ['action-id' => 2, 'action' => 'list', 'label' => 'List', 'description' => 'List virtual hosts on your system'],
+            ['action-id' => 3, 'action' => 'enable', 'label' => 'Enable', 'description' => 'Enable a inactive host'],
+            ['action-id' => 4, 'action' => 'disable', 'label' => 'Disable', 'description' => 'Disable a active host']
         ];
     }
 
@@ -46,14 +47,12 @@ class Init{
     private function validateDomain()
     {
         //validate domain
-        while (!preg_match('/^[a-zA-Z0-9.]+$/', $this->domain)) {
+        while (!empty($this->domain) && !preg_match('/^[a-zA-Z0-9.]+$/', $this->domain)) {
 
-            if (!preg_match('/^[a-zA-Z0-9.]+$/', $this->domain)) {
-                echo "Error: Can't contain spaces or any special characters except for a dot (.)" . PHP_EOL;
-            }
+            echo "Error: Can't contain spaces or any special characters except for a dot (.)" . PHP_EOL;
 
             echo "Enter Domain Name: ";
-            $this->domain = strtolower(fgets(STDIN));
+            $this->domain = trim(strtolower(fgets(STDIN)));
         }
     }
 
@@ -67,7 +66,7 @@ class Init{
             }
 
             echo "Enter Domain Name: ";
-            $this->domain = strtolower(fgets(STDIN));
+            $this->domain = strtolower(trim(fgets(STDIN)));
         }
     }
 
@@ -81,7 +80,7 @@ class Init{
             }
 
             echo "Enter Domain Name: ";
-            $this->domain = strtolower(fgets(STDIN));
+            $this->domain = strtolower(trim(fgets(STDIN)));
         }
     }
 
@@ -226,15 +225,7 @@ class Init{
     public function list(): array
     {
         //validate domain
-        while (!empty($this->domain) && !preg_match('/^[a-zA-Z0-9.]+$/', $this->domain)) {
-
-            if (!preg_match('/^[a-zA-Z0-9.]+$/', $this->domain)) {
-                echo "Error: Can't contain spaces or any special characters except for a dot (.)" . PHP_EOL;
-            }
-
-            echo "Enter Domain Name: ";
-            $this->domain = strtolower(fgets(STDIN));
-        }
+        $this->validateDomain();
 
         $directory = '/etc/apache2/';
         $available_configs = scandir($directory . 'sites-available');
@@ -284,7 +275,6 @@ class Init{
                 }
             }
         }
-        echo PHP_EOL;
 
         return ['status' => 3, 'type' => '', 'message' => ''];
     }
@@ -305,9 +295,13 @@ class Init{
 
             $message = $this->domain . " has been enabled.";
 
-        } elseif (strpos($output, "Site $this->domain already enabled.") !== false){
+        } elseif (strpos($output, "Site $this->domain already enabled") !== false){
 
             $message = $this->domain . " already enabled";
+
+        } elseif (strpos($output, "Enabling site $this->domain.") !== false){
+
+            $message = $this->domain . " has been enabled.";
 
         } else {
 
@@ -333,7 +327,7 @@ class Init{
 
             $message = $this->domain . " has been disabled.";
 
-        } elseif (strpos($output, "Site $this->domain already enabled.") !== false){
+        } elseif (strpos($output, "Site $this->domain already disabled") !== false){
 
             $message = $this->domain . " already disabled.";
 
