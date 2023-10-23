@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Devironment.iml" filepath="$PROJECT_DIR$/.idea/Devironment.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../socialo/cricket/wp-content/plugins/crickScore/.idea/crickScore.iml" filepath="$PROJECT_DIR$/../socialo/cricket/wp-content/plugins/crickScore/.idea/crickScore.iml" />
     </modules>
   </component>
 </project>

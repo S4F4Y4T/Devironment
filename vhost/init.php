@@ -2,7 +2,7 @@
 
 require_once 'validation.php';
 
-class Init{
+class Vhost{
 
     private $domain;
     private $project_name;
