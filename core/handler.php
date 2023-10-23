@@ -1,20 +1,29 @@
 <?php
+
 class handler{
+
     public $cmdList;
     public $appName;
     public $version;
     public $author;
     public $repository;
     public $branch;
-    public function __construct($appName, $version, $author, $repository, $branch){
+    public $projectDir;
+    
+    public function __construct($appName, $version, $author, $repository, $branch, $projectDir){
 
         $this->appName = $appName;
         $this->version = $version;
         $this->author = $author;
         $this->repository = $repository;
         $this->branch = $branch;
+        $this->projectDir = $projectDir;
 
-        //all available commands and there actions
+        $this->registerCmd();
+    }
+    
+    public function registerCmd(){
+    	//all available commands and there actions
         $this->cmdList = [
             'help' => [
                 'description' => 'List all available commands',
@@ -44,16 +53,14 @@ class handler{
                 'description' => 'Exit the program',
                 'action' => 'kill'
             ]
-//    'apache' => [
-//        'description' => 'Install Apache',
-//        'action' => 'apache'
-//    ],
-//    'mysqldump' => [
-//        'description' => 'Backup Mysql Dump Ex: mysqldump [username] [password] [dbname] [backupfile] --optional [host] --optional',
-//        'action' => 'mysqldump'
-//    ]
         ];
     }
+    
+    public function getCmd()
+    {
+    	return $this->cmdList;
+    }
+    
     public function getAction(string $action, array $options)
     {
         if(empty($action) && !empty($options)){
@@ -81,8 +88,7 @@ class handler{
 
     public function isGit()
     {
-        $parentDirectory = __DIR__; // Get the parent directory of the current working directory
-        $command = "git -C $parentDirectory rev-parse --is-inside-work-tree 2>&1";
+        $command = "git -C ".$this->projectDir." rev-parse --is-inside-work-tree 2>&1";
         $output = shell_exec($command);
 
         // Check the output of the command
@@ -104,11 +110,12 @@ class handler{
         echo "Checking for new updates...". PHP_EOL;
 
         // Get the latest commit SHA from the remote repository
-        $latestRemoteCommit = trim(shell_exec("git ls-remote $this->repository $this->branch"));
+        $latestRemoteCommit = shell_exec("git ls-remote $this->repository $this->branch");
+        $latestRemoteCommit = explode("	", $latestRemoteCommit);
 
         // Get the local commit SHA of the branch
-        $localCommit = trim(shell_exec("git rev-parse $this->branch"));
-
+        $localCommit = trim(shell_exec("git -C $this->projectDir rev-parse $this->branch"));
+        
         if ($latestRemoteCommit[0] ?? "" === $localCommit) {
             return ['status' => 3, 'type' => 'success', 'message' => "Up to date! Nothing to update."];
         }
@@ -181,9 +188,7 @@ class handler{
 
     public function vhost(string $action = "", string $domain = "", string $project_name = "" , string $dir = "")
     {
-        require_once 'vhost/init.php';
-
-        if($this->sudo()['type'] === 'error'){
+      	if($this->sudo()['type'] === 'error'){
             return ['status' => 3, 'type' => 'error', 'message' => 'This operation require superuser (sudo) privileges.'];
         }
 
@@ -192,11 +197,12 @@ class handler{
         if (trim($apacheStatus) !== 'active') {
             return ['status' => 3, 'type' => 'error', 'message' => 'Apache service is not active.'];
         }
-
+        
+        //load require files
+        require_once $this->projectDir . '/vhost/init.php';
         $init = new Vhost($domain, $project_name , $dir);
-        $options = $init->getOptions();
 
-        $action = $this->getAction($action, $options); // take user action and validate
+        $action = $this->getAction($action, $init->getOptions()); // take user action and validate
 
         //call the appropriate method according to user action
         switch ($action) {

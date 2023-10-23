@@ -5,9 +5,11 @@
     $author = "S4F4Y4T";
     $repository = 'https://github.com/S4F4Y4T/Devironment'; // url of original git repo
     $branch = 'main'; // name of the master branch
+    $projectDir = dirname(__DIR__);
 
-    require_once '../handler.php';
-    $handler = new handler($appName, $version, $author, $repository, $branch);
+    require_once $projectDir . '/core/handler.php';
+    
+    $handler = new handler($appName, $version, $author, $repository, $branch, $projectDir);
 
     echo "    
     ________   _______________   ____.___ __________ ________    _______      _____   ___________ _______ ___________ 
@@ -39,7 +41,7 @@
     while (($response['status'] ?? 0) === 3) {
 
         if (!empty($response['message'])) {
-            switch ($response['type']) {
+            switch ($response['type'] ?? "") {
                 case 'success':
                     echo "\033[32m" . $response['message'] . "\033[0m" . PHP_EOL;
                     break;
