@@ -3,17 +3,18 @@
 require_once 'validation.php';
 
 class Vhost{
-
     private $domain;
     private $project_name;
     private $dir;
     private $validation;
+    private $usrDir;
 
     public function __construct($domain = "", $project_name = "" , $dir = ""){
         $this->domain = trim($domain);
         $this->project_name = trim($project_name);
         $this->dir = trim($dir);
         $this->validation = new validation();
+        $this->usrDir = '/home/'. get_current_user();
     }
 
     public function getOptions() : array
@@ -26,13 +27,9 @@ class Vhost{
         ];
     }
 
-    public function validateOption(string $action) : bool
+    //validate empty domain name
+    private function inputDomain()
     {
-        return $this->validation->validate_option($action, $this->getOptions());
-    }
-
-    private function captureDomain(){
-        //validate empty domain name
         while (empty($this->domain)) {
 
             echo "Enter Domain Name: ";
@@ -44,56 +41,49 @@ class Vhost{
         }
     }
 
-    private function validateDomain()
+    //validate domain name
+    private function validateDomainName()
     {
-        //validate domain
         while (!empty($this->domain) && !preg_match('/^[a-zA-Z0-9.]+$/', $this->domain)) {
 
             echo "Error: Can't contain spaces or any special characters except for a dot (.)" . PHP_EOL;
 
             echo "Enter Domain Name: ";
-            $this->domain = trim(strtolower(fgets(STDIN)));
+            $this->domain = trim(fgets(STDIN));
         }
     }
 
-    private function validDomain()
+    private function validateDomain()
     {
         //validate domain
-        while (!$this->validation->duplicate_domain($this->domain)) {
+        while (!$this->validation->is_exist($this->domain)) {
 
-            if (!$this->validation->duplicate_domain($this->domain)) {
+            if (!$this->validation->is_exist($this->domain)) {
                 echo "Error: This virtual host does not exists in your system" . PHP_EOL;
             }
 
             echo "Enter Domain Name: ";
-            $this->domain = strtolower(trim(fgets(STDIN)));
+            $this->domain = trim(fgets(STDIN));
         }
     }
 
+    //validate duplicate domain
     private function duplicateDomain()
     {
-        //validate domain
-        while ($this->validation->duplicate_domain($this->domain)) {
+        while ($this->validation->is_exist($this->domain)) {
 
-            if ($this->validation->duplicate_domain($this->domain)) {
+            if ($this->validation->is_exist($this->domain)) {
                 echo "Error: This virtual host already exists in your system ". $this->domain . PHP_EOL;
             }
 
             echo "Enter Domain Name: ";
-            $this->domain = strtolower(trim(fgets(STDIN)));
+            $this->domain = trim(fgets(STDIN));
         }
     }
 
-    public function create(): array
+    //validate empty project name
+    private function inputProjectName()
     {
-        //validate empty domain name
-        $this->captureDomain();
-        //validate domain
-        $this->validateDomain();
-        //validate duplicate domain
-        $this->duplicateDomain();
-
-        //validate empty project name
         while (empty($this->project_name)) {
 
             echo "Enter your Project Name: ";
@@ -103,77 +93,94 @@ class Vhost{
                 echo "Error: Project name cannot be empty" . PHP_EOL;
             }
         }
-        //validate empty directory
+    }
+
+    //validate empty directory
+    private function inputDir()
+    {
         while (empty($this->dir)) {
 
-            echo "Enter Directory Path: ";
+            echo "Enter Directory Path: \033[32m" . $this->usrDir . "/". "\033[0m";
             $this->dir = trim(fgets(STDIN));
 
             if (empty($this->dir)) {
-
                 echo "Error: Directory cannot be empty" . PHP_EOL;
-
             }
-
         }
-        //append '/' to directory
-        if (substr($this->dir, -1) != '/') {
-            $this->dir .= '/';
-        }
-        //validate directory
-        while (!is_dir($this->dir)) {
+    }
 
-            if (!is_dir($this->dir)) {
+    //validate invalid directory
+    private function validateDir()
+    {
+        while (!is_dir($this->usrDir . $this->dir)) {
+            if (!is_dir($this->usrDir . $this->dir)) {
                 echo "Error: Invalid directory" . PHP_EOL;
             }
 
-            echo "Enter Directory Path: ";
+            echo "Enter Directory Path: \033[32m" . $this->usrDir . "/". "\033[0m";
             $this->dir = trim(fgets(STDIN));
+        }
+    }
 
+    public function create(): array
+    {
+        $this->inputDomain(); //take domain input
+        $this->validateDomainName(); //validate domain name
+        $this->duplicateDomain(); //validate duplicate domain
+        $this->inputProjectName(); //validate empty project name
+        $this->inputDir(); //validate empty dir
+//        $this->validateDir(); //validate invalid dir
+
+        //prepend / to directory
+        if (substr($this->dir, 0, 1) !== '/') {
+            $this->dir = '/' . $this->dir;
+        }
+
+        //append '/' to directory
+        if (substr($this->dir, -1) != '/') {
+            $this->dir .= '/';
         }
 
         echo "Initializing..." . PHP_EOL;
 
         //process virtual host
         try {
+            $projectDir = $this->usrDir . $this->dir . $this->project_name;
             //make directory and set permission if doesn't exist
-            if (!is_dir($this->dir . $this->project_name)) {
+            if (!is_dir($projectDir)) {
 
-                if (!mkdir($this->dir . $this->project_name, 0775, true)) {
+                if (!mkdir($projectDir, 0775, true)) {
                     throw new Exception('An error occurred while making the project directory.' . PHP_EOL);
                 }
 
-                chown($this->dir . $this->project_name, get_current_user()); // update permission
+                //set ownership for all recursive new directory
+                $directoryParts = explode('/', $projectDir);
+                $partialPath = '';
+
+                if(!empty($directoryParts)){
+                    foreach ($directoryParts as $part) {
+                        if(!empty($part)){
+                            $partialPath .= '/' . $part;
+
+                            if (file_exists($partialPath)) {
+                                if (!chown($partialPath, get_current_user())) {
+                                    throw new Exception('Failed to change ownership.' . PHP_EOL);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 //handle index.html file for new directory
-                $indexFilePath = $this->dir . $this->project_name . "/index.html";
-                $index = fopen($indexFilePath, "w");
-
-                if ($index) {
-                    $html = "<!DOCTYPE html>
-                        <html>
-                            <head>
-                              <meta charset='UTF-8'>
-                              <title>Powered BY VHOST</title>
-                            </head>
-                            <body>
-                              This site was generated by Devironment
-                            </body>
-                        </html>";
-
-                    if (fwrite($index, $html) !== false) {
-                        chown($indexFilePath, get_current_user());
-                    }
-
-                    fclose($index);
-                }
+                copy(__DIR__ . '/dummy', $projectDir.'/index.html');
+                chown($projectDir.'/index.html', get_current_user());
             }
 
             echo "Project initiated" . PHP_EOL;
 
             $vhost = fopen('/etc/apache2/sites-available/' . $this->domain . '.conf', "w");
             $conf = '<VirtualHost ' . $this->domain . ':80>
-                    <Directory ' . $this->dir . $this->project_name . '>
+                    <Directory ' . $projectDir . '>
                         Options Indexes FollowSymLinks MultiViews
                         AllowOverride All
                         Require all granted
@@ -181,7 +188,7 @@ class Vhost{
                     ServerAdmin admin@' . $this->domain . '
                     ServerName ' . $this->domain . '
                     ServerAlias www.' . $this->domain . '
-                    DocumentRoot ' . $this->dir . $this->project_name . '
+                    DocumentRoot ' . $projectDir . '
                     ErrorLog ${APACHE_LOG_DIR}/error.log
                 </VirtualHost>';
             fwrite($vhost, $conf);
@@ -201,12 +208,7 @@ class Vhost{
             echo "Enabling server..." . PHP_EOL;
             echo "Restarting server..." . PHP_EOL;
 
-            $command = "a2ensite " . $this->domain . ".conf; systemctl reload apache2";
-            $restart = shell_exec($command);// create virtual host configuration and enable apache2 site and restart apache2
-
-            if ($restart === null) {
-                throw new Exception("Apache failed to restart.");
-            }
+            $this->enable(); //enable and restart apache
 
             echo "Server Enabled" . PHP_EOL;
             echo "Server Restarted" . PHP_EOL;
@@ -225,7 +227,7 @@ class Vhost{
     public function list(): array
     {
         //validate domain
-        $this->validateDomain();
+        $this->validateDomainName();
 
         $directory = '/etc/apache2/';
         $available_configs = scandir($directory . 'sites-available');
@@ -234,6 +236,11 @@ class Vhost{
         //filter ubuntu default virtual hosts
         $available_configs = array_filter($available_configs, function ($item) {return $item !== "000-default.conf" && $item !== "default-ssl.conf"; });
         $enable_configs = array_filter($enable_configs, function ($item) {return $item !== "000-default.conf" && $item !== "default-ssl.conf"; });
+
+        if(empty($available_configs) && empty($enable_configs))
+        {
+            return ['status' => 3, 'type' => '', 'message' => 'No virtual hosts available'];
+        }
 
         //extract .conf from the end of the domain
         $available_configs = array_map(function($available_config) { return str_replace('.conf', '', $available_config); }, $available_configs);
@@ -281,9 +288,9 @@ class Vhost{
 
     public function enable(): array
     {
-        $this->captureDomain();
+        $this->inputDomain();
+        $this->validateDomainName();
         $this->validateDomain();
-        $this->validDomain();
 
         // Command to enable the virtual host
         $command = "a2ensite ".$this->domain.".conf; systemctl reload apache2";
@@ -313,9 +320,9 @@ class Vhost{
 
     public function disable(): array
     {
-        $this->captureDomain();
+        $this->inputDomain();
+        $this->validateDomainName();
         $this->validateDomain();
-        $this->validDomain();
 
         // Command to enable the virtual host
         $command = "a2dissite ".$this->domain.".conf; systemctl reload apache2";

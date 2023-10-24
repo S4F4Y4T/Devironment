@@ -1,7 +1,6 @@
 <?php
 
 class handler{
-
     public $cmdList;
     public $appName;
     public $version;
@@ -228,21 +227,6 @@ class handler{
         }
 
         return $response;
-    }
-
-    public function apache()
-    {
-        $command_list = [
-            'sudo apt-get update',
-            'sudo apt-get install apache2',
-            'ufw allow in "Apache"',
-            'sudo systemctl restart apache2',
-        ];
-
-        $command = implode(';', $command_list);
-        shell_exec($command);
-
-        return ['status' => 1, 'type' => 'success', 'message' => 'Apache installed successfully. Go to http://localhost'];
     }
 
     public function mysqldump($username = "", $password = "", $db = "")
