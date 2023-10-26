@@ -1,100 +1,90 @@
 <?php
 
-if (posix_geteuid() !== 0)
-{
-    echo "\033[31mThis script require sudo(super user) privilege\033[0m" . PHP_EOL. PHP_EOL;
-    exit();
-}
-
-echo "Processing...". PHP_EOL;
-
-// Define the current directory
-$currentDirectory = __DIR__; // Current directory where your script is located
-// Define the target directory
-$targetDirectory = '/usr/local/bin/devironment';
-// Define the script name
-$scriptName = 'devironment.php';
-// Running with sudo, get the home directory of the user who invoked sudo
-$loggedInUser = $_SERVER['SUDO_USER'];
-
-echo "Copying directory...". PHP_EOL;
-//copy folder to target folder
-function copyDirectory($source, $destination) {
-    global $loggedInUser;
-    // Create the destination directory if it doesn't exist
-    if (!is_dir($destination)) {
-        mkdir($destination, 0755, true);
+    if (posix_geteuid() !== 0)
+    {
+        echo "\033[31mThis script require sudo(super user) privilege\033[0m" . PHP_EOL. PHP_EOL;
+        exit();
     }
 
-    // Get a list of all files and directories in the source directory
-    $items = glob("$source/*");
+    echo "Initializing...". PHP_EOL;
+    echo "Setting up directory...". PHP_EOL;
 
-    foreach ($items as $item) {
-        $destItem = $destination . '/' . basename($item);
+    try{
+        // Define the current directory
+        $currentDirectory = __DIR__; // Current directory where your script is located
+        // Define the target directory
+        $dependencyDirectory = '/usr/local/lib/devironment';
+        processFileSystem($currentDirectory, $dependencyDirectory); //process files to their appropriate destination
+        echo "Installation Completed.". PHP_EOL;
 
-        if (is_dir($item)) {
-            // If it's a directory, recursively copy its contents
-            copyDirectory($item, $destItem);
-        } else {
-            // If it's a file, copy it to the destination
-            if (!copy($item, $destItem)) {
-                echo "Error: Copying file $item" . PHP_EOL;
+    } catch (Exception $e) {
+        echo "An Error Occurred: " .$e->getMessage(). PHP_EOL;
+    }
+
+    //copy folder to target folder
+    /**
+     * @throws Exception
+     */
+    function processFileSystem($source, $destDir)
+    {
+        // Define the script name
+        global $currentDirectory;
+        $scriptName = 'dev';
+        // Running with sudo, get the home directory of the user who invoked sudo
+        $loggedInUser = $_SERVER['SUDO_USER'];
+
+        //if the source dir is bin then process the bin file instead of dependency dir
+        if ($source === $currentDirectory. "/bin") {
+            $binaries = scandir($currentDirectory. "/bin");
+            if(!empty($binaries)){
+                foreach ($binaries as $bin) {
+                    if ($bin != '.' && $bin != '..') {
+                        if (is_file($currentDirectory. "/bin/" . $bin)) {
+                            $destItem = '/usr/local/bin/'. $scriptName;
+                            if (!copy($currentDirectory. "/bin/" . $bin, $destItem)) {
+                                throw new Exception('Executable File could not copy.' . PHP_EOL);
+                            }
+                        }
+                    }
+                }
             }
+        }else{
+
+            // Create the destination directory if it doesn't exist
+            if (!is_dir($destDir)) {
+                if(!mkdir($destDir, 0755, true)){
+                    throw new Exception('An error occurred while making directory.' . PHP_EOL);
+                }
+            }
+
+            // Get a list of all files and directories in the source directory
+            $items = scandir($source);
+
+            if(!empty($items)){
+                foreach ($items as $item) {
+                    if ($item[0] !== '.' && $item != '.git') { //filter everything starts with . except .git
+
+                        $destItem = $destDir . '/' . basename($item);
+
+                        if (is_dir($item)) {
+                            // If it's a directory, recursively copy its contents
+                            processFileSystem($source . DIRECTORY_SEPARATOR .$item, $destItem);
+                        } else {
+                            // If it's a file, copy it to the destination
+                            if (!copy($source . DIRECTORY_SEPARATOR .$item, $destItem)) {
+                                throw new Exception('File could not copy.' . PHP_EOL);
+                            }
+                        }
+
+                    }
+                }
+            }
+
         }
 
-        chown($destItem, $loggedInUser);
-        chgrp($destItem, $loggedInUser);
-        chgrp($destItem, 0755);
+        if(isset($destItem)){
+            chown($destItem, $loggedInUser); //update ownership of file
+            chgrp($destItem, $loggedInUser); //update group of file
+            chmod($destItem, 0755); //update permission of file
+        }
     }
-}
-
-copyDirectory($currentDirectory, $targetDirectory);
-//chmod($targetDirectory.'/public/'.$scriptName, 0755);
-
-// Determine the user's default shell
-$userShell = shell_exec('basename $SHELL');
-
-// Check the default shell and update the corresponding configuration file
-if (trim($userShell) === 'bash') {
-    // Bash shell
-    $configFile = $_SERVER['HOME'] . '/.bashrc';
-} elseif (trim($userShell) === 'zsh') {
-    // Zsh shell
-    $configFile = $_SERVER['HOME'] . '/.zshrc';
-} else {
-    // Default to Bash if the shell type is not recognized
-    $configFile = $_SERVER['HOME'] . '/.bashrc';
-}
-echo "Adding to executable path variable...". PHP_EOL;
-// Prepare the export command with the new directory
-$exportCommand = 'export PATH="$PATH:' . $targetDirectory . '/public"';
-
-$homeDirectory = posix_getpwnam($loggedInUser)['dir'];
-// Get the content of the user's .bashrc file
-$bashrcFile = $homeDirectory . '/.bashrc';
-
-// Check if the export command already exists in .bashrc
-$existingContent = file_get_contents($bashrcFile);
-if (strpos($existingContent, $exportCommand) === false) {
-    // Append the export command to the .bashrc file
-    if (file_put_contents($bashrcFile, $exportCommand . PHP_EOL, FILE_APPEND | LOCK_EX) === false) {
-        echo "Error modifying shell config" . PHP_EOL;
-    }
-}
-
-// add the executable dir for sudo as well
-$sudoers = '/etc/sudoers.d/devironment';  // Specify the file you want to modify.
-$newSecurePath = 'Defaults secure_path="<default value>:/usr/local/bin/devironment/public"';  // Define the new secure path.
-
-if (!file_exists($sudoers)) {
-    // If the file doesn't exist, create it and write the configuration.
-    $file = fopen($sudoers, 'w');
-    if ($file) {
-        fwrite($file, $newSecurePath);
-        fclose($file);
-        echo "Adding the path to sudo path variable...". PHP_EOL;
-    }
-}
-
-echo "Installation Completed.". PHP_EOL;
-

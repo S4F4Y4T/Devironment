@@ -60,7 +60,7 @@ class handler{
     	return $this->cmdList;
     }
     
-    public function getAction(string $action, array $options)
+    public function getAction(string $action, array $options): string
     {
         if(empty($action) && !empty($options)){
             echo PHP_EOL;
@@ -85,7 +85,7 @@ class handler{
         return $action;
     }
 
-    public function isGit()
+    public function isGit(): bool
     {
         $command = "git -C ".$this->projectDir." rev-parse --is-inside-work-tree 2>&1";
         $output = shell_exec($command);

@@ -154,7 +154,7 @@ class Vhost{
                 }
 
                 //set ownership for all recursive new directory
-                $directoryParts = explode('/', $projectDir);
+                $directoryParts = explode('/', $this->dir . $this->project_name);
                 $partialPath = '';
 
                 if(!empty($directoryParts)){
@@ -163,7 +163,7 @@ class Vhost{
                             $partialPath .= '/' . $part;
 
                             if (file_exists($partialPath)) {
-                                if (!chown($partialPath, get_current_user())) {
+                                if (!chown($this->usrDir . $partialPath, get_current_user())) {
                                     throw new Exception('Failed to change ownership.' . PHP_EOL);
                                 }
                             }
@@ -172,7 +172,7 @@ class Vhost{
                 }
 
                 //handle index.html file for new directory
-                copy(__DIR__ . '/dummy', $projectDir.'/index.html');
+                copy(__DIR__ . '/demo', $projectDir.'/index.html');
                 chown($projectDir.'/index.html', get_current_user());
             }
 

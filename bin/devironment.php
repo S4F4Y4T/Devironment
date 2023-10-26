@@ -1,11 +1,16 @@
 #!/usr/bin/env php
 <?php
     $appName = "Devironment";
-    $version = "3.0.0";
+    $version = "4.0.0";
     $author = "S4F4Y4T";
     $repository = 'https://github.com/S4F4Y4T/Devironment'; // url of original git repo
     $branch = 'main'; // name of the master branch
     $projectDir = dirname(__DIR__);
+
+    if($projectDir.'/bin' === '/usr/local/bin')
+    {
+        $projectDir = '/usr/local/lib/devironment';
+    }
 
     require_once $projectDir . '/core/handler.php';
     
@@ -25,9 +30,9 @@
     echo "# Repository: " . $repository . PHP_EOL;
 
     //Handle script update validation
-    $status = $handler->status();
     $response = ['status' => 3, 'message' => ''];
     if($handler->isGit()) {
+        $status = $handler->status();
         if ($status['type'] === 'error') {
             $response['type'] = 'error';
             $response['message'] = $status['message'];
