@@ -1,5 +1,7 @@
 <?php
 
+use vhost\Vhost;
+
 class handler{
     public $cmdList;
     public $appName;
@@ -20,10 +22,15 @@ class handler{
 
         $this->registerCmd();
     }
-    
-    public function registerCmd(){
+
+    //register available commands
+    private function registerCmd(){
     	//all available commands and there actions
         $this->cmdList = [
+            'install' => [
+                'description' => 'Install script globally',
+                'action' => 'installer'
+            ],
             'help' => [
                 'description' => 'List all available commands',
                 'action' => 'help'
@@ -36,7 +43,7 @@ class handler{
                 'description' => 'Check for new update',
                 'action' => 'status'
             ],
-            'sync' => [
+            'latest' => [
                 'description' => 'Update to latest version',
                 'action' => 'sync'
             ],
@@ -44,7 +51,7 @@ class handler{
                 'description' => 'Check Your Internet Connection',
                 'action' => 'ping'
             ],
-            'vhost' => [
+            'host' => [
                 'description' => 'Manage Virtual Hosts. EX: vhost [action] [domain] [project name] [directory]',
                 'action' => 'vhost'
             ],
@@ -54,12 +61,14 @@ class handler{
             ]
         ];
     }
-    
+
+    //get commands array
     public function getCmd()
     {
     	return $this->cmdList;
     }
-    
+
+    //get user input match with available options
     public function getAction(string $action, array $options): string
     {
         if(empty($action) && !empty($options)){
@@ -85,21 +94,23 @@ class handler{
         return $action;
     }
 
+    //validate if git is available in local
     public function isGit(): bool
     {
-        $command = "git -C ".$this->projectDir." rev-parse --is-inside-work-tree 2>&1";
+        $command = "git -C $this->projectDir rev-parse --is-inside-work-tree 2>&1";
         $output = shell_exec($command);
 
         // Check the output of the command
         return trim($output) === "true";
     }
 
-    //all actions function
+    //check script function
     public function version(): array
     {
         return ['status' => 3, 'type' => 'success', 'message' => $this->version ?? "0.0.0"];
     }
 
+    //validate if new update available
     public function status(): array
     {
         if(!$this->isGit()){
@@ -122,33 +133,89 @@ class handler{
         return ['status' => 3, 'type' => 'error', 'message' => "There is a new version available."];
     }
 
+    //install script globally
+    public function installer(): array
+    {
+        exec('which devenv', $output, $exitCode);
+
+        if($exitCode === 0){
+//            return ['status' => 3, 'type' => 'error', 'message' => 'This script is already installed on your device.'];
+        }
+
+        if($this->sudo()['type'] === 'error'){
+            return ['status' => 3, 'type' => 'error', 'message' => 'This operation require superuser (sudo) privileges.'];
+        }
+
+        echo "Installing...". PHP_EOL;
+        ob_start();
+        require_once $this->projectDir.'/installer.php'; //run installer
+        $output = get_object_vars(json_decode(ob_get_clean())); //catch the response from installer
+
+        return ['status' => 3, 'type' => $output['type'] ?? 'error', 'message' => $output['message'] ?? "Something went wrong."];
+    }
+
+    //update script to latest version
     public function sync(): array
     {
-        if(!$this->isGit()){
+        if($this->ping()['type'] === 'error')
+        {
+            return ['status' => 3, 'type' => 'error', 'message' => 'Your internet is not available.'];
+        }
+        //validate if git exist
+        if(!$this->isGit())
+        {
             return ['status' => 3, 'type' => 'error', 'message' => "Script repository not found."];
         }
-
-        if($this->status()['type'] === 'success'){
+        //validate if new update is available
+        if($this->status()['type'] === 'success')
+        {
             return ['status' => 3, 'type' => 'error', 'message' => "Up to date! Nothing to update."];
         }
+        //validate if sudo privilege
+        if($this->sudo()['type'] === 'error')
+        {
+            return ['status' => 3, 'type' => 'error', 'message' => 'This operation require superuser (sudo) privileges.'];
+        }
 
-        echo "Processing...". PHP_EOL;
+        if(!file_exists($this->projectDir.'/installer.php'))
+        {
+            return ['status' => 3, 'type' => 'error', 'message' => 'Installer not found.'];
+        }
+
+        echo "Initializing...". PHP_EOL;
 
         // Execute a `git pull` command to fetch and apply the latest changes from the remote repository
-        $gitPullOutput = shell_exec("git pull $this->repository $this->branch");
+        $gitPullOutput = shell_exec("git -C $this->projectDir pull $this->repository $this->branch");
 
         if (strpos($gitPullOutput, 'Already up to date') !== false) {
+
             $response = ['status' => 3, 'message' => "Already up to date."];
+
         } elseif (strpos($gitPullOutput, 'Updating') !== false) {
-            $response = ['status' => 3, 'type' => 'success', 'message' => "Updated successfully! Restart to make the changes."];
+
+            $installer = $this->installer(); //run installer
+
+            if($installer['type'] ?? "error" === "success"){
+
+                $response = ['status' => 3, 'type' => 'success', 'message' => "Script updated to latest version successfully! Restart to make the changes."];
+
+            }else{
+
+                $response = ['status' => 3, 'type' => 'error', 'message' => $installer['message']];
+
+            }
+
         }else{
+
             $response = ['status' => 3, 'type' => 'error', 'message' => "Something went wrong."];
+
         }
 
         return $response;
     }
 
-    public function sudo()
+    //validate if user in sudo mode
+    private function sudo(): array
     {
         if (posix_geteuid() !== 0)
         {
@@ -158,6 +225,7 @@ class handler{
         return ['status' => 3, 'type' => 'success', 'message' => 'This user has superuser (sudo) privileges.'];
     }
 
+    //validate if internet available
     public function ping(): array
     {
         $ipAddress = '8.8.8.8'; // Google Public DNS
@@ -171,11 +239,13 @@ class handler{
         return ['status' => 3, 'type' => 'error', 'message' => 'Internet is not available'];
     }
 
+    //close the application
     public function kill(): array
     {
         return ['status' => 1, 'message' => 'Exiting Program...'];
     }
 
+    //check all available commands
     public function help(): array
     {
         foreach ($this->cmdList as $key => $val) {
@@ -185,7 +255,8 @@ class handler{
         return ['status' => 3, 'message' => ''];
     }
 
-    public function vhost(string $action = "", string $domain = "", string $project_name = "" , string $dir = "")
+    //mange virtual hosts
+    public function vhost(string $action = "", string $domain = "", string $project_name = "" , string $dir = ""): array
     {
       	if($this->sudo()['type'] === 'error'){
             return ['status' => 3, 'type' => 'error', 'message' => 'This operation require superuser (sudo) privileges.'];
@@ -198,7 +269,7 @@ class handler{
         }
         
         //load require files
-        require_once $this->projectDir . '/vhost/init.php';
+        require_once $this->projectDir . '/modules/vhost/init.php';
         $init = new Vhost($domain, $project_name , $dir);
 
         $action = $this->getAction($action, $init->getOptions()); // take user action and validate
@@ -227,65 +298,5 @@ class handler{
         }
 
         return $response;
-    }
-
-    public function mysqldump($username = "", $password = "", $db = "")
-    {
-        $dbConfig = __DIR__ . '/.db.cnf';
-
-        // Check if the option file exists
-        if (file_exists($dbConfig)) {
-
-            // Option file exists, update the content
-            $content = "[client]\nuser=$username\npassword=$password\n";
-            file_put_contents($dbConfig, $content);
-            echo "DB Config updated.\n" . PHP_EOL;
-
-        } else {
-
-            // Option file doesn't exist, create a new one
-            $content = "[client]\nuser=$username\npassword=$password\n";
-            if (file_put_contents($dbConfig, $content) !== false) {
-
-                chmod($dbConfig, 0600); // Set permissions to make it readable and writable only by the owner
-                echo "DB Config created.\n" . PHP_EOL;
-
-            } else {
-
-                echo "Unable to write content to the file.";
-                return ['status' => 3, 'type' => 'error', 'message' => 'Unable to write content to the file.'];
-            }
-
-        }
-
-        exec('mysql --defaults-extra-file=' . $dbConfig . ' -e "SELECT 1"', $output, $return_var);
-
-        // Check if the command was successful
-        if ($return_var !== 0) {
-            // Command failed, and $output may contain error messages
-            return ['status' => 3, 'type' => 'error', 'message' => 'Invalid DB Config '];
-        }
-
-
-        $downloadDir = '/home/' . get_current_user() . '/Downloads/';
-        if (!$downloadDir) {
-            echo "Download directory not found.";
-            return ['status' => 3, 'type' => 'error', 'message' => 'Download directory not found.'];
-        }
-
-        $command = 'mysqldump --defaults-extra-file=' . $dbConfig . ' ' . $db . ' > ' . $downloadDir . $db . '~' . date("Y-m-d") . '.sql';
-
-        exec($command, $output, $return_var);
-
-        // Check if the command was successful
-        if ($return_var === 0) {
-
-            return ['status' => 3, 'type' => 'success', 'message' => 'Backup Successful'];
-
-        } else {
-            // Command failed, and $output may contain error messages
-            $messages = implode("\n", $output);
-            return ['status' => 3, 'type' => 'error', 'message' => 'Backup Failed: ' . $messages];
-        }
     }
 }

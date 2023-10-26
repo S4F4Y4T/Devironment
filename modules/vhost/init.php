@@ -1,23 +1,28 @@
 <?php
 
+namespace vhost;
+
 require_once 'validation.php';
 
-class Vhost{
+class Vhost
+{
     private $domain;
     private $project_name;
     private $dir;
     private $validation;
     private $usrDir;
 
-    public function __construct($domain = "", $project_name = "" , $dir = ""){
+    public function __construct($domain = "", $project_name = "", $dir = "")
+    {
         $this->domain = trim($domain);
         $this->project_name = trim($project_name);
         $this->dir = trim($dir);
         $this->validation = new validation();
-        $this->usrDir = '/home/'. get_current_user();
+//        $this->usrDir = '/home/'. get_current_user();
+        $this->usrDir = '/var/www';
     }
 
-    public function getOptions() : array
+    public function getOptions(): array
     {
         return [
             ['action-id' => 1, 'action' => 'create', 'label' => 'Create', 'description' => 'Create New Virtual Host'],
@@ -73,7 +78,7 @@ class Vhost{
         while ($this->validation->is_exist($this->domain)) {
 
             if ($this->validation->is_exist($this->domain)) {
-                echo "Error: This virtual host already exists in your system ". $this->domain . PHP_EOL;
+                echo "Error: This virtual host already exists in your system " . $this->domain . PHP_EOL;
             }
 
             echo "Enter Domain Name: ";
@@ -98,15 +103,15 @@ class Vhost{
     //validate empty directory
     private function inputDir()
     {
-        while (empty($this->dir)) {
+//        while (empty($this->dir)) {
 
-            echo "Enter Directory Path: \033[32m" . $this->usrDir . "/". "\033[0m";
+            echo "Enter Directory Path: \033[32m" . $this->usrDir . "/ " . "\033[0m";
             $this->dir = trim(fgets(STDIN));
 
-            if (empty($this->dir)) {
-                echo "Error: Directory cannot be empty" . PHP_EOL;
-            }
-        }
+//            if (empty($this->dir)) {
+//                echo "Error: Directory cannot be empty" . PHP_EOL;
+//            }
+//        }
     }
 
     //validate invalid directory
@@ -117,7 +122,7 @@ class Vhost{
                 echo "Error: Invalid directory" . PHP_EOL;
             }
 
-            echo "Enter Directory Path: \033[32m" . $this->usrDir . "/". "\033[0m";
+            echo "Enter Directory Path: \033[32m" . $this->usrDir . "/ " . "\033[0m";
             $this->dir = trim(fgets(STDIN));
         }
     }
@@ -128,7 +133,7 @@ class Vhost{
         $this->validateDomainName(); //validate domain name
         $this->duplicateDomain(); //validate duplicate domain
         $this->inputProjectName(); //validate empty project name
-        $this->inputDir(); //validate empty dir
+        $this->inputDir(); //take input dir
 //        $this->validateDir(); //validate invalid dir
 
         //prepend / to directory
@@ -157,9 +162,9 @@ class Vhost{
                 $directoryParts = explode('/', $this->dir . $this->project_name);
                 $partialPath = '';
 
-                if(!empty($directoryParts)){
+                if (!empty($directoryParts)) {
                     foreach ($directoryParts as $part) {
-                        if(!empty($part)){
+                        if (!empty($part)) {
                             $partialPath .= '/' . $part;
 
                             if (file_exists($partialPath)) {
@@ -172,8 +177,8 @@ class Vhost{
                 }
 
                 //handle index.html file for new directory
-                copy(__DIR__ . '/demo', $projectDir.'/index.html');
-                chown($projectDir.'/index.html', get_current_user());
+                copy(__DIR__ . '/demo', $projectDir . '/index.html');
+                chown($projectDir . '/index.html', get_current_user());
             }
 
             echo "Project initiated" . PHP_EOL;
@@ -234,21 +239,27 @@ class Vhost{
         $enable_configs = scandir($directory . 'sites-enabled');
 
         //filter ubuntu default virtual hosts
-        $available_configs = array_filter($available_configs, function ($item) {return $item !== "000-default.conf" && $item !== "default-ssl.conf"; });
-        $enable_configs = array_filter($enable_configs, function ($item) {return $item !== "000-default.conf" && $item !== "default-ssl.conf"; });
+        $available_configs = array_filter($available_configs, function ($item) {
+            return $item !== "000-default.conf" && $item !== "default-ssl.conf";
+        });
+        $enable_configs = array_filter($enable_configs, function ($item) {
+            return $item !== "000-default.conf" && $item !== "default-ssl.conf";
+        });
 
-        if(empty($available_configs) && empty($enable_configs))
-        {
+        if (empty($available_configs) && empty($enable_configs)) {
             return ['status' => 3, 'type' => '', 'message' => 'No virtual hosts available'];
         }
 
         //extract .conf from the end of the domain
-        $available_configs = array_map(function($available_config) { return str_replace('.conf', '', $available_config); }, $available_configs);
-        $enable_configs = array_map(function($enable_config) { return str_replace('.conf', '', $enable_config); }, $enable_configs);
+        $available_configs = array_map(function ($available_config) {
+            return str_replace('.conf', '', $available_config);
+        }, $available_configs);
+        $enable_configs = array_map(function ($enable_config) {
+            return str_replace('.conf', '', $enable_config);
+        }, $enable_configs);
 
         //if any domain passed then filter out all other domain
-        if(!empty($this->domain))
-        {
+        if (!empty($this->domain)) {
             $domain = $this->domain;
             $available_configs = array_filter($available_configs, function ($item) use ($domain) {
                 return $item === $domain;
@@ -259,26 +270,26 @@ class Vhost{
             });
         }
 
-        if(!empty($available_configs)){
+        if (!empty($available_configs)) {
             foreach ($available_configs as $config) {
                 if ($config != '.' && $config != '..') {
-                    $path = $directory . 'sites-available' . DIRECTORY_SEPARATOR . $config.'.conf';
+                    $path = $directory . 'sites-available' . DIRECTORY_SEPARATOR . $config . '.conf';
                     if (is_file($path)) {
                         $status = in_array($config, $enable_configs) ? "(\033[32mActive\033[0m) [http://$config]" : "(Inactive)";
-                        echo "      [] $config $status". PHP_EOL;
+                        echo "      [] $config $status" . PHP_EOL;
                     }
                 }
             }
         }
 
-        if(!empty($enable_configs)){
+        if (!empty($enable_configs)) {
 
             $enable_configs = array_diff($enable_configs, $available_configs);
 
             foreach ($enable_configs as $config) {
                 if ($config != '.' && $config != '..') {
-                    $path = $directory . 'sites-enabled' . DIRECTORY_SEPARATOR . $config.'.conf';
-                    echo "      [] $config (\033[31mBroken\033[0m)". PHP_EOL;
+                    $path = $directory . 'sites-enabled' . DIRECTORY_SEPARATOR . $config . '.conf';
+                    echo "      [] $config (\033[31mBroken\033[0m)" . PHP_EOL;
                 }
             }
         }
@@ -293,7 +304,7 @@ class Vhost{
         $this->validateDomain();
 
         // Command to enable the virtual host
-        $command = "a2ensite ".$this->domain.".conf; systemctl reload apache2";
+        $command = "a2ensite " . $this->domain . ".conf; systemctl reload apache2";
 
         // Execute the command and capture the output and exit code
         $output = shell_exec($command);
@@ -302,11 +313,11 @@ class Vhost{
 
             $message = $this->domain . " has been enabled.";
 
-        } elseif (strpos($output, "Site $this->domain already enabled") !== false){
+        } elseif (strpos($output, "Site $this->domain already enabled") !== false) {
 
             $message = $this->domain . " already enabled";
 
-        } elseif (strpos($output, "Enabling site $this->domain.") !== false){
+        } elseif (strpos($output, "Enabling site $this->domain.") !== false) {
 
             $message = $this->domain . " has been enabled.";
 
@@ -325,7 +336,7 @@ class Vhost{
         $this->validateDomain();
 
         // Command to enable the virtual host
-        $command = "a2dissite ".$this->domain.".conf; systemctl reload apache2";
+        $command = "a2dissite " . $this->domain . ".conf; systemctl reload apache2";
 
         // Execute the command and capture the output and exit code
         $output = shell_exec($command);
@@ -334,7 +345,7 @@ class Vhost{
 
             $message = $this->domain . " has been disabled.";
 
-        } elseif (strpos($output, "Site $this->domain already disabled") !== false){
+        } elseif (strpos($output, "Site $this->domain already disabled") !== false) {
 
             $message = $this->domain . " already disabled.";
 

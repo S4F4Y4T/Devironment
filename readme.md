@@ -6,9 +6,6 @@ The tool provides a convenient and hassle-free solution for developers to get st
 
 The tool is easy to use and requires no prior knowledge of setting up a development environment. Simply run the script and follow the prompts, and your development environment will be up and running in no time.
 
-And, last but not least, Devironment is a tool of the dev, by the dev, and for the dev
-
-
 ## Authors
 
 - [@S4F4Y4T](https://www.github.com/S4F4Y4T)
@@ -16,20 +13,28 @@ And, last but not least, Devironment is a tool of the dev, by the dev, and for t
 
 ## Features
 
-- Manage Virtual Host
-- Manage Apache
-- Dump Mysql DB
+- Built in installer
+- Version Updater
+- Manage virtual hosts efficiently
+- Small features like checking internet availability
+- Easy to use and interactive
 
+## Upcoming
+
+- Moduler Architecture
+- Manage Web Server
+- Manage Database operations
 
 ## Prerequisite
 
-- PHP 7.2 or higher
+- PHP 7+
 - Ubuntu
 
 ## Screenshots
 
-![devironment](https://user-images.githubusercontent.com/46479689/218276746-46d16fa1-0d13-4deb-b50d-eae6b72affd6.png)
-## Run Locally
+![Screenshot from 2023-10-27 00-52-34.png](..%2F..%2FPictures%2FScreenshots%2FScreenshot%20from%202023-10-27%2000-52-34.png)
+
+## How to use
 
 Clone the project
 
@@ -40,15 +45,22 @@ Clone the project
 Go to the project directory
 
 ```bash
-  cd devironment.php
+  cd devironment
 ```
 
-Run the script
+Run the installer
 
 ```bash
-  sudo php devironment.php
+  sudo php installer.php
 ```
 
+or
+
+Run the installer from script
+
+```bash
+  cd bin && php devenv.php install
+```
 
 ## Contributing
 

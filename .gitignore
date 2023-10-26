@@ -6,5 +6,21 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
-.idea
-.idea/*
+# JetBrains IDE-specific files
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Compiled binary files
+*.class
+*.jar
+
+# Log files and logs directory
+logs/
+*.log
+
+# Dependency directories
+node_modules/
+vendor/
