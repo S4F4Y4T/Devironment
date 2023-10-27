@@ -2,15 +2,17 @@
 
 namespace vhost;
 
+use Exception;
+
 require_once 'validation.php';
 
-class Vhost
+class vhost
 {
-    private $domain;
-    private $project_name;
-    private $dir;
-    private $validation;
-    private $usrDir;
+    private string $domain;
+    private string $project_name;
+    private string $dir;
+    private validation $validation;
+    private string $usrDir;
 
     public function __construct($domain = "", $project_name = "", $dir = "")
     {
@@ -33,7 +35,7 @@ class Vhost
     }
 
     //validate empty domain name
-    private function inputDomain()
+    private function inputDomain(): void
     {
         while (empty($this->domain)) {
 
@@ -47,7 +49,7 @@ class Vhost
     }
 
     //validate domain name
-    private function validateDomainName()
+    private function validateDomainName(): void
     {
         while (!empty($this->domain) && !preg_match('/^[a-zA-Z0-9.]+$/', $this->domain)) {
 
@@ -58,7 +60,7 @@ class Vhost
         }
     }
 
-    private function validateDomain()
+    private function validateDomain(): void
     {
         //validate domain
         while (!$this->validation->is_exist($this->domain)) {
@@ -73,7 +75,7 @@ class Vhost
     }
 
     //validate duplicate domain
-    private function duplicateDomain()
+    private function duplicateDomain(): void
     {
         while ($this->validation->is_exist($this->domain)) {
 
@@ -87,7 +89,7 @@ class Vhost
     }
 
     //validate empty project name
-    private function inputProjectName()
+    private function inputProjectName(): void
     {
         while (empty($this->project_name)) {
 
@@ -101,7 +103,7 @@ class Vhost
     }
 
     //validate empty directory
-    private function inputDir()
+    private function inputDir(): void
     {
 //        while (empty($this->dir)) {
 
@@ -115,7 +117,7 @@ class Vhost
     }
 
     //validate invalid directory
-    private function validateDir()
+    private function validateDir(): void
     {
         while (!is_dir($this->usrDir . $this->dir)) {
             if (!is_dir($this->usrDir . $this->dir)) {
@@ -127,7 +129,7 @@ class Vhost
         }
     }
 
-    public function create(): array
+    public function create(): array | null
     {
         $this->inputDomain(); //take domain input
         $this->validateDomainName(); //validate domain name
@@ -137,12 +139,12 @@ class Vhost
 //        $this->validateDir(); //validate invalid dir
 
         //prepend / to directory
-        if (substr($this->dir, 0, 1) !== '/') {
+        if (!str_starts_with($this->dir, '/')) {
             $this->dir = '/' . $this->dir;
         }
 
         //append '/' to directory
-        if (substr($this->dir, -1) != '/') {
+        if (!str_ends_with($this->dir, '/')) {
             $this->dir .= '/';
         }
 
@@ -167,7 +169,7 @@ class Vhost
                         if (!empty($part)) {
                             $partialPath .= '/' . $part;
 
-                            if (file_exists($partialPath)) {
+                            if (file_exists($this->usrDir .$partialPath)) {
                                 if (!chown($this->usrDir . $partialPath, get_current_user())) {
                                     throw new Exception('Failed to change ownership.' . PHP_EOL);
                                 }
@@ -184,19 +186,22 @@ class Vhost
             echo "Project initiated" . PHP_EOL;
 
             $vhost = fopen('/etc/apache2/sites-available/' . $this->domain . '.conf', "w");
-            $conf = '<VirtualHost ' . $this->domain . ':80>
-                    <Directory ' . $projectDir . '>
+
+            $virtualHostConfig = <<<EOT
+                <VirtualHost {$this->domain}:80>
+                    <Directory {$projectDir}>
                         Options Indexes FollowSymLinks MultiViews
                         AllowOverride All
                         Require all granted
                     </Directory>
-                    ServerAdmin admin@' . $this->domain . '
-                    ServerName ' . $this->domain . '
-                    ServerAlias www.' . $this->domain . '
-                    DocumentRoot ' . $projectDir . '
-                    ErrorLog ${APACHE_LOG_DIR}/error.log
-                </VirtualHost>';
-            fwrite($vhost, $conf);
+                    ServerAdmin admin@{$this->domain}
+                    ServerName {$this->domain}
+                    ServerAlias www.{$this->domain}
+                    DocumentRoot {$projectDir}
+                    ErrorLog \${APACHE_LOG_DIR}/error.log
+                </VirtualHost>
+                EOT;
+            fwrite($vhost, $virtualHostConfig);
             fclose($vhost);
 
             echo "Apache config initiated" . PHP_EOL;
@@ -209,27 +214,22 @@ class Vhost
             // Write the new contents back to the file
             file_put_contents($hosts, $new_record);
 
-            echo "Server host initiated" . PHP_EOL;
-            echo "Enabling server..." . PHP_EOL;
-            echo "Restarting server..." . PHP_EOL;
+            echo "Server added to host" . PHP_EOL;
 
             $this->enable(); //enable and restart apache
-
-            echo "Server Enabled" . PHP_EOL;
-            echo "Server Restarted" . PHP_EOL;
 
             $message = 'Virtual Host generated successfully. Go to http://' . $this->domain;
 
         } catch (Exception $e) {
             // Handle the exception
             $message = "An error occurred: " . $e->getMessage();
-            $status = 'error';
+            $status = 0;
         }
 
-        return ['status' => 3, 'type' => $status ?? 'success', 'message' => $message];
+        return ['status' => $status ?? 1, 'message' => $message];
     }
 
-    public function list(): array
+    public function list(): ?array
     {
         //validate domain
         $this->validateDomainName();
@@ -247,7 +247,7 @@ class Vhost
         });
 
         if (empty($available_configs) && empty($enable_configs)) {
-            return ['status' => 3, 'type' => '', 'message' => 'No virtual hosts available'];
+            return ['status' => 0, 'message' => 'No virtual hosts available'];
         }
 
         //extract .conf from the end of the domain
@@ -294,7 +294,7 @@ class Vhost
             }
         }
 
-        return ['status' => 3, 'type' => '', 'message' => ''];
+        return null;
     }
 
     public function enable(): array
@@ -304,29 +304,32 @@ class Vhost
         $this->validateDomain();
 
         // Command to enable the virtual host
-        $command = "a2ensite " . $this->domain . ".conf; systemctl reload apache2";
+        $command = "a2ensite " . $this->domain . ".conf; systemctl restart apache2";
+
+        echo "Enabling site " . $this->domain. PHP_EOL;
 
         // Execute the command and capture the output and exit code
         $output = shell_exec($command);
 
-        if (strpos($output, "Site $this->domain enabled.") !== false) {
+        if (str_contains($output, "Site $this->domain enabled.")) {
 
             $message = $this->domain . " has been enabled.";
 
-        } elseif (strpos($output, "Site $this->domain already enabled") !== false) {
+        } elseif (str_contains($output, "Site $this->domain already enabled")) {
 
             $message = $this->domain . " already enabled";
 
-        } elseif (strpos($output, "Enabling site $this->domain.") !== false) {
+        } elseif (str_contains($output, "Enabling site $this->domain.")) {
 
             $message = $this->domain . " has been enabled.";
 
         } else {
 
+            $status = 0;
             $message = "Error enabling " . $this->domain . " Details: " . PHP_EOL . $output;
         }
 
-        return ['status' => 3, 'type' => '', 'message' => $message];
+        return ['status' => $status ?? 1, 'message' => $message];
     }
 
     public function disable(): array
@@ -336,23 +339,28 @@ class Vhost
         $this->validateDomain();
 
         // Command to enable the virtual host
-        $command = "a2dissite " . $this->domain . ".conf; systemctl reload apache2";
+        $command = "a2dissite " . $this->domain . ".conf; systemctl restart apache2";
+
+        echo "Disabling site " . $this->domain;
 
         // Execute the command and capture the output and exit code
         $output = shell_exec($command);
 
-        if (strpos($output, "Site $this->domain disabled.") !== false) {
+        if (str_contains($output, "Site $this->domain disabled.")) {
 
             $message = $this->domain . " has been disabled.";
 
-        } elseif (strpos($output, "Site $this->domain already disabled") !== false) {
+        } elseif (str_contains($output, "Site $this->domain already disabled")) {
 
             $message = $this->domain . " already disabled.";
 
         } else {
+            $status = 0;
             $message = "Error disabling " . $this->domain . " Details: " . PHP_EOL . $output;
         }
 
-        return ['status' => 3, 'type' => '', 'message' => $message ?? ""];
+        return ['status' => $status ?? 1, 'message' => $message];
     }
+
+
 }

@@ -1,15 +1,16 @@
 <?php
 
-use vhost\Vhost;
+use apache\apache;
+use vhost\vhost;
 
 class handler{
-    public $cmdList;
-    public $appName;
-    public $version;
-    public $author;
-    public $repository;
-    public $branch;
-    public $projectDir;
+    public array $cmdList;
+    public string $appName;
+    public string $version;
+    public string $author;
+    public string $repository;
+    public string $branch;
+    public string $projectDir;
     
     public function __construct($appName, $version, $author, $repository, $branch, $projectDir){
 
@@ -19,14 +20,13 @@ class handler{
         $this->repository = $repository;
         $this->branch = $branch;
         $this->projectDir = $projectDir;
-
-        $this->registerCmd();
     }
 
     //register available commands
-    private function registerCmd(){
+    private function registerCmd(): array
+    {
     	//all available commands and there actions
-        $this->cmdList = [
+        return [
             'install' => [
                 'description' => 'Install script globally',
                 'action' => 'installer'
@@ -55,6 +55,10 @@ class handler{
                 'description' => 'Manage Virtual Hosts. EX: vhost [action] [domain] [project name] [directory]',
                 'action' => 'vhost'
             ],
+            'apache' => [
+                'description' => 'Manage Apache Server',
+                'action' => 'apache'
+            ],
             'kill' => [
                 'description' => 'Exit the program',
                 'action' => 'kill'
@@ -63,13 +67,13 @@ class handler{
     }
 
     //get commands array
-    public function getCmd()
+    public function getCmd() : array
     {
-    	return $this->cmdList;
+    	return $this->registerCmd();
     }
 
     //get user input match with available options
-    public function getAction(string $action, array $options): string
+    private function getAction(string $action, array $options): string
     {
         if(empty($action) && !empty($options)){
             echo PHP_EOL;
@@ -95,7 +99,7 @@ class handler{
     }
 
     //validate if git is available in local
-    public function isGit(): bool
+    private function isGit(): bool
     {
         $command = "git -C $this->projectDir rev-parse --is-inside-work-tree 2>&1";
         $output = shell_exec($command);
@@ -107,14 +111,14 @@ class handler{
     //check script function
     public function version(): array
     {
-        return ['status' => 3, 'type' => 'success', 'message' => $this->version ?? "0.0.0"];
+        return ['status' => 1, 'message' => $this->version ?? "0.0.0"];
     }
 
     //validate if new update available
     public function status(): array
     {
         if(!$this->isGit()){
-            return ['status' => 3, 'type' => 'error', 'message' => "Script repository not found."];
+            return ['status' => 0, 'message' => "Script repository not found."];
         }
 
         echo "Checking for new updates...". PHP_EOL;
@@ -127,10 +131,10 @@ class handler{
         $localCommit = trim(shell_exec("git -C $this->projectDir rev-parse $this->branch"));
         
         if ($latestRemoteCommit[0] ?? "" === $localCommit) {
-            return ['status' => 3, 'type' => 'success', 'message' => "Up to date! Nothing to update."];
+            return ['status' => 1, 'message' => "Up to date! Nothing to update."];
         }
 
-        return ['status' => 3, 'type' => 'error', 'message' => "There is a new version available."];
+        return ['status' => 0, 'message' => "There is a new version available."];
     }
 
     //install script globally
@@ -139,11 +143,11 @@ class handler{
         exec('which devenv', $output, $exitCode);
 
         if($exitCode === 0){
-//            return ['status' => 3, 'type' => 'error', 'message' => 'This script is already installed on your device.'];
+            return ['status' => 0, 'message' => 'This script is already installed on your device.'];
         }
 
-        if($this->sudo()['type'] === 'error'){
-            return ['status' => 3, 'type' => 'error', 'message' => 'This operation require superuser (sudo) privileges.'];
+        if((int)($this->sudo()['status'] ?? 0) === 0){
+            return ['status' => 0, 'message' => 'This operation require superuser (sudo) privileges.'];
         }
 
         echo "Installing...". PHP_EOL;
@@ -151,35 +155,35 @@ class handler{
         require_once $this->projectDir.'/installer.php'; //run installer
         $output = get_object_vars(json_decode(ob_get_clean())); //catch the response from installer
 
-        return ['status' => 3, 'type' => $output['type'] ?? 'error', 'message' => $output['message'] ?? "Something went wrong."];
+        return ['status' => $output['status'] ?? 0, 'message' => $output['message'] ?? "Something went wrong."];
     }
 
     //update script to latest version
     public function sync(): array
     {
-        if($this->ping()['type'] === 'error')
+        if((int)($this->ping()['status'] ?? 0) === 0)
         {
-            return ['status' => 3, 'type' => 'error', 'message' => 'Your internet is not available.'];
+            return ['status' => 0, 'message' => 'Your internet is not available.'];
         }
         //validate if git exist
         if(!$this->isGit())
         {
-            return ['status' => 3, 'type' => 'error', 'message' => "Script repository not found."];
+            return ['status' => 0, 'message' => "Script repository not found."];
         }
         //validate if new update is available
-        if($this->status()['type'] === 'success')
+        if((int)($this->status()['status'] ?? 0) === 1)
         {
-            return ['status' => 3, 'type' => 'error', 'message' => "Up to date! Nothing to update."];
+            return ['status' => 0, 'message' => "Up to date! Nothing to update."];
         }
         //validate if sudo privilege
-        if($this->sudo()['type'] === 'error')
+        if((int)($this->sudo()['status'] ?? 0) === 0)
         {
-            return ['status' => 3, 'type' => 'error', 'message' => 'This operation require superuser (sudo) privileges.'];
+            return ['status' => 0, 'message' => 'This operation require superuser (sudo) privileges.'];
         }
 
         if(!file_exists($this->projectDir.'/installer.php'))
         {
-            return ['status' => 3, 'type' => 'error', 'message' => 'Installer not found.'];
+            return ['status' => 0, 'message' => 'Installer not found.'];
         }
 
         echo "Initializing...". PHP_EOL;
@@ -189,25 +193,25 @@ class handler{
 
         if (strpos($gitPullOutput, 'Already up to date') !== false) {
 
-            $response = ['status' => 3, 'message' => "Already up to date."];
+            $response = ['message' => "Already up to date."];
 
         } elseif (strpos($gitPullOutput, 'Updating') !== false) {
 
             $installer = $this->installer(); //run installer
 
-            if($installer['type'] ?? "error" === "success"){
+            if((int)($installer['status'] ?? 0) === 1){
 
-                $response = ['status' => 3, 'type' => 'success', 'message' => "Script updated to latest version successfully! Restart to make the changes."];
+                $response = ['status' => 1, 'message' => "Script updated to latest version successfully! Restart to make the changes."];
 
             }else{
 
-                $response = ['status' => 3, 'type' => 'error', 'message' => $installer['message']];
+                $response = ['status' => 0, 'message' => $installer['message']];
 
             }
 
         }else{
 
-            $response = ['status' => 3, 'type' => 'error', 'message' => "Something went wrong."];
+            $response = ['status' => 0, 'message' => "Something went wrong."];
 
         }
 
@@ -219,10 +223,10 @@ class handler{
     {
         if (posix_geteuid() !== 0)
         {
-            return ['status' => 3, 'type' => 'error', 'message' => 'This user do not has superuser (sudo) privileges.'];
+            return ['status' => 0, 'message' => 'This user do not has superuser (sudo) privileges.'];
         }
 
-        return ['status' => 3, 'type' => 'success', 'message' => 'This user has superuser (sudo) privileges.'];
+        return ['status' => 1, 'message' => 'This user has superuser (sudo) privileges.'];
     }
 
     //validate if internet available
@@ -233,44 +237,44 @@ class handler{
         exec("ping -c 1 -W 2 $ipAddress", $output, $exitCode);
 
         if($exitCode === 0){
-            return ['status' => 3, 'type' => 'success', 'message' => 'Internet is available'];
+            return ['status' => 1, 'message' => 'Internet is available'];
         }
 
-        return ['status' => 3, 'type' => 'error', 'message' => 'Internet is not available'];
+        return ['status' => 0, 'message' => 'Internet is not available'];
     }
 
     //close the application
     public function kill(): array
     {
-        return ['status' => 1, 'message' => 'Exiting Program...'];
+        return ['processing' => 0, 'message' => 'Exiting Program...'];
     }
 
     //check all available commands
-    public function help(): array
+    public function help(): void
     {
-        foreach ($this->cmdList as $key => $val) {
+        foreach ($this->getCmd() as $key => $val) {
             echo '  [] ' . $key . ' - ' . $val['description'] . PHP_EOL;
         }
 
-        return ['status' => 3, 'message' => ''];
+        return;
     }
 
     //mange virtual hosts
-    public function vhost(string $action = "", string $domain = "", string $project_name = "" , string $dir = ""): array
+    public function vhost(string $action = "", string $domain = "", string $project_name = "" , string $dir = ""): array | null
     {
-      	if($this->sudo()['type'] === 'error'){
-            return ['status' => 3, 'type' => 'error', 'message' => 'This operation require superuser (sudo) privileges.'];
+      	if((int)($this->sudo()['status'] ?? 0) === 0){
+            return ['status' => 0, 'message' => 'This operation require superuser (sudo) privileges.'];
         }
 
         // validate if apache is active
         $apacheStatus = shell_exec('systemctl is-active apache2');
         if (trim($apacheStatus) !== 'active') {
-            return ['status' => 3, 'type' => 'error', 'message' => 'Apache service is not active.'];
+            return ['status' => 0, 'message' => 'Apache service is not active.'];
         }
         
         //load require files
         require_once $this->projectDir . '/modules/vhost/init.php';
-        $init = new Vhost($domain, $project_name , $dir);
+        $init = new vhost($domain, $project_name , $dir);
 
         $action = $this->getAction($action, $init->getOptions()); // take user action and validate
 
@@ -293,7 +297,34 @@ class handler{
                 $response = $init->disable();
                 break;
             default:
-                $response = ['status' => 3, 'type' => '', 'message' => 'No action found'];
+                $response = ['message' => 'Invalid action'];
+                break;
+        }
+
+        return $response;
+    }
+
+    //mange web server
+    public function apache(string $action = ""): array | null
+    {
+        if((int)($this->sudo()['status'] ?? 0) === 0){
+            return ['status' => 0, 'message' => 'This operation require superuser (sudo) privileges.'];
+        }
+
+        //load require files
+        require_once $this->projectDir . '/modules/apache/init.php';
+        $init = new apache();
+
+        $action = $this->getAction($action, $init->getOptions()); // take user action and validate
+
+        //call the appropriate method according to user action
+        switch ($action) {
+            case 'status':
+            case 1:
+                $response = $init->status();
+                break;
+            default:
+                $response = ['message' => 'Invalid action'];
                 break;
         }
 

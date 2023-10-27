@@ -33,7 +33,6 @@ if(!function_exists('processFileSystem'))
             }
 
             chown($destDir, $loggedInUser); //update ownership of file
-            chgrp($destDir, $loggedInUser); //update group of file
         }
 
         // Get a list of all files and directories in the source directory
@@ -65,7 +64,6 @@ if(!function_exists('processFileSystem'))
                     }
 
                     chown($destItem, $loggedInUser); //update ownership of file
-                    chgrp($destItem, $loggedInUser); //update group of file
                     chmod($destItem, 0755); //update permission of file
                 }
             }
@@ -92,7 +90,7 @@ if(!function_exists('processFileSystem'))
         if(realpath(__FILE__) == realpath($_SERVER['SCRIPT_FILENAME'])){
             echo "\033[32mInstallation is completed. run '$scriptName' to execute\033[0m". PHP_EOL. PHP_EOL;
         }else{
-            echo json_encode(['status' => 1, 'type' => 'success', 'message' => "Installation completed. run '$scriptName' to execute"]);
+            echo json_encode(['status' => 1, 'message' => "Installation completed. run '$scriptName' to execute"]);
         }
 
     } catch (Exception $e) {
@@ -100,6 +98,6 @@ if(!function_exists('processFileSystem'))
         if(realpath(__FILE__) == realpath($_SERVER['SCRIPT_FILENAME'])) {
             echo "An Error Occurred: " .$e->getMessage(). PHP_EOL;
         }else{
-            echo json_encode(['status' => 0, 'type' => 'error', 'message' => "An Error Occurred: " .$e->getMessage()]);
+            echo json_encode(['status' => 0, 'message' => "An Error Occurred: " .$e->getMessage()]);
         }
     }

@@ -27,7 +27,7 @@ The tool is easy to use and requires no prior knowledge of setting up a developm
 
 ## Prerequisite
 
-- PHP 7+
+- PHP 8+
 - Ubuntu
 
 ## Screenshots
