@@ -32,7 +32,7 @@ The tool is easy to use and requires no prior knowledge of setting up a developm
 
 ## Screenshots
 
-![Screenshot from 2023-10-27 00-52-34.png](..%2F..%2FPictures%2FScreenshots%2FScreenshot%20from%202023-10-27%2000-52-34.png)
+![overview](images/ss.png)
 
 ## How to use
 
