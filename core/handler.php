@@ -135,7 +135,15 @@ class handler{
             return ['status' => 1, 'message' => "Up to date! Nothing to update."];
         }
 
-        return ['status' => 0, 'message' => "There is a new version available."];
+        echo "There is a new version available." . PHP_EOL;
+        echo "Would you like to update now? (yes/no): ";
+        $answer = strtolower(trim(fgets(STDIN)));
+
+        if ($answer === 'yes' || $answer === 'y') {
+            return $this->sync();
+        }
+
+        return ['status' => 0, 'message' => "Run 'latest' to update."];
     }
 
     //install script globally
