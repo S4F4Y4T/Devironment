@@ -131,7 +131,7 @@ class handler{
         // Get the local commit SHA of the branch
         $localCommit = trim(shell_exec("git -C $this->projectDir rev-parse $this->branch"));
         
-        if ($latestRemoteCommit[0] ?? "" === $localCommit) {
+        if (($latestRemoteCommit[0] ?? "") === $localCommit) {
             return ['status' => 1, 'message' => "Up to date! Nothing to update."];
         }
 
