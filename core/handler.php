@@ -59,6 +59,10 @@ class handler{
                 'description' => 'Manage Apache Server',
                 'action' => 'apache'
             ],
+            'uninstall' => [
+                'description' => 'Uninstall Devironment from this system',
+                'action' => 'uninstall'
+            ],
             'kill' => [
                 'description' => 'Exit the program',
                 'action' => 'kill'
@@ -358,5 +362,72 @@ class handler{
         }
 
         return $response;
+    }
+
+    public function checkDependencies(): void
+    {
+        $checks = [
+            'PHP >= 8.0'      => PHP_VERSION_ID >= 80000,
+            'PHP posix ext'   => extension_loaded('posix'),
+            'git'             => !empty(trim(shell_exec('which git 2>/dev/null') ?? '')),
+            'apache2'         => !empty(trim(shell_exec('which apache2 2>/dev/null') ?? '')),
+            'a2ensite'        => !empty(trim(shell_exec('which a2ensite 2>/dev/null') ?? '')),
+            'a2dissite'       => !empty(trim(shell_exec('which a2dissite 2>/dev/null') ?? '')),
+            'systemctl'       => !empty(trim(shell_exec('which systemctl 2>/dev/null') ?? '')),
+        ];
+
+        $allPassed = true;
+
+        echo "Checking dependencies..." . PHP_EOL;
+
+        foreach ($checks as $label => $passed) {
+            $icon   = $passed ? "\033[32m[OK]\033[0m" : "\033[31m[MISSING]\033[0m";
+            echo "  $icon $label" . PHP_EOL;
+            if (!$passed) $allPassed = false;
+        }
+
+        if (!$allPassed) {
+            echo PHP_EOL . "\033[31mOne or more dependencies are missing. Some features may not work.\033[0m" . PHP_EOL;
+        }
+
+        echo PHP_EOL;
+    }
+
+    public function uninstall(): array
+    {
+        if ((int)($this->sudo()['status'] ?? 0) === 0) {
+            return ['status' => 0, 'message' => 'This operation require superuser (sudo) privileges.'];
+        }
+
+        echo "This will remove Devironment and all its files from your system." . PHP_EOL;
+        echo "Are you sure? (yes/no): ";
+        $answer = strtolower(trim(fgets(STDIN)));
+
+        if ($answer !== 'yes' && $answer !== 'y') {
+            return ['status' => 3, 'message' => 'Uninstall cancelled.'];
+        }
+
+        $errors = [];
+
+        $binary = '/usr/local/bin/devenv';
+        if (file_exists($binary)) {
+            if (!unlink($binary)) {
+                $errors[] = "Failed to remove $binary";
+            }
+        }
+
+        $libDir = '/usr/local/lib/devironment';
+        if (is_dir($libDir)) {
+            $result = shell_exec("rm -rf " . escapeshellarg($libDir) . " 2>&1");
+            if (is_dir($libDir)) {
+                $errors[] = "Failed to remove $libDir";
+            }
+        }
+
+        if (!empty($errors)) {
+            return ['status' => 0, 'message' => implode(PHP_EOL, $errors)];
+        }
+
+        return ['status' => 1, 'message' => 'Devironment has been uninstalled successfully.', 'processing' => 0];
     }
 }

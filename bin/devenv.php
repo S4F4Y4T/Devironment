@@ -18,6 +18,8 @@ require_once $projectDir . '/core/handler.php';
 $handler = new handler($appName, $version, $author, $repository, $branch, $projectDir);
 $response = ['processing' => 1];
 
+$handler->checkDependencies();
+
 echo "    
     ________   _______________   ____.___ __________ ________    _______      _____   ___________ _______ ___________ 
     \______ \  \_   _____/\   \ /   /|   |\______   \\_____  \   \      \    /     \  \_   _____/ \      \\__    ___/ 
