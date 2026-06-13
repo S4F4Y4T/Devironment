@@ -122,7 +122,7 @@ class handler{
             return ['status' => 0, 'message' => "Script repository not found."];
         }
 
-        echo "Checking for new updates...". PHP_EOL;
+        echo "Checking for new update...". PHP_EOL;
 
         // Get the latest commit SHA from the remote repository
         $latestRemoteCommit = shell_exec("git ls-remote $this->repository $this->branch");
