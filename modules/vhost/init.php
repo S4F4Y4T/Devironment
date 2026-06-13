@@ -6,6 +6,8 @@ use Exception;
 
 require_once 'validation.php';
 
+class BackException extends \RuntimeException {}
+
 class vhost
 {
     private string $domain;
@@ -35,13 +37,26 @@ class vhost
         ];
     }
 
+    private function readLine(): string
+    {
+        $input = trim(fgets(STDIN));
+        if (strtolower($input) === 'back') {
+            throw new BackException();
+        }
+        return $input;
+    }
+
     //validate empty domain name
     private function inputDomain(): void
     {
+        if (empty($this->domain)) {
+            echo "(type 'back' to cancel)" . PHP_EOL;
+        }
+
         while (empty($this->domain)) {
 
             echo "Enter Domain Name: ";
-            $this->domain = strtolower(trim(fgets(STDIN)));
+            $this->domain = strtolower($this->readLine());
 
             if (empty(trim($this->domain))) {
                 echo "Error: Domain cannot be empty" . PHP_EOL;
@@ -57,7 +72,7 @@ class vhost
             echo "Error: Can't contain spaces or any special characters except for a dot (.)" . PHP_EOL;
 
             echo "Enter Domain Name: ";
-            $this->domain = trim(fgets(STDIN));
+            $this->domain = $this->readLine();
         }
     }
 
@@ -71,7 +86,7 @@ class vhost
             }
 
             echo "Enter Domain Name: ";
-            $this->domain = trim(fgets(STDIN));
+            $this->domain = $this->readLine();
         }
     }
 
@@ -85,7 +100,7 @@ class vhost
             }
 
             echo "Enter Domain Name: ";
-            $this->domain = trim(fgets(STDIN));
+            $this->domain = $this->readLine();
         }
     }
 
@@ -95,7 +110,7 @@ class vhost
         while (empty($this->project_name)) {
 
             echo "Enter your Project Name: ";
-            $this->project_name = trim(fgets(STDIN));
+            $this->project_name = $this->readLine();
 
             if (empty($this->project_name)) {
                 echo "Error: Project name cannot be empty" . PHP_EOL;
@@ -109,7 +124,7 @@ class vhost
 //        while (empty($this->dir)) {
 
             echo "Enter Directory Path: \033[32m" . $this->usrDir . "/ " . "\033[0m";
-            $this->dir = trim(fgets(STDIN));
+            $this->dir = $this->readLine();
 
 //            if (empty($this->dir)) {
 //                echo "Error: Directory cannot be empty" . PHP_EOL;

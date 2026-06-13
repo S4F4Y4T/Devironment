@@ -79,13 +79,14 @@ class handler{
             echo PHP_EOL;
             echo "Which action you want to perform?" . PHP_EOL;
             foreach ($options as $option){
-                echo "      [".$option['action-id']."]".$option['label']."- ".$option['description']. PHP_EOL;
+                echo "      [".$option['action-id']."] ".$option['label']." - ".$option['description']. PHP_EOL;
             }
+            echo "      [back] Go back" . PHP_EOL;
             echo PHP_EOL;
         }
 
         //take action user wants to perform
-        while (!(in_array($action, array_column($options, 'action')) || in_array($action, array_column($options, 'action-id')))) {
+        while (!(in_array($action, array_column($options, 'action')) || in_array($action, array_column($options, 'action-id')) || $action === 'back')) {
 
             if(!empty($action)){
                 echo "Error: Invalid action" . PHP_EOL;
@@ -278,31 +279,39 @@ class handler{
 
         $action = $this->getAction($action, $init->getOptions()); // take user action and validate
 
+        if ($action === 'back') {
+            return ['status' => 3, 'message' => ''];
+        }
+
         //call the appropriate method according to user action
-        switch ($action) {
-            case 'create':
-            case 1:
-                $response = $init->create();
-                break;
-            case 'list':
-            case 2:
-                $response = $init->list();
-                break;
-            case 3:
-            case 'enable':
-                $response = $init->enable();
-                break;
-            case 4:
-            case 'disable':
-                $response = $init->disable();
-                break;
-            case 5:
-            case 'remove':
-                $response = $init->remove();
-                break;
-            default:
-                $response = ['message' => 'Invalid action'];
-                break;
+        try {
+            switch ($action) {
+                case 'create':
+                case 1:
+                    $response = $init->create();
+                    break;
+                case 'list':
+                case 2:
+                    $response = $init->list();
+                    break;
+                case 3:
+                case 'enable':
+                    $response = $init->enable();
+                    break;
+                case 4:
+                case 'disable':
+                    $response = $init->disable();
+                    break;
+                case 5:
+                case 'remove':
+                    $response = $init->remove();
+                    break;
+                default:
+                    $response = ['message' => 'Invalid action'];
+                    break;
+            }
+        } catch (\vhost\BackException $e) {
+            return ['status' => 3, 'message' => ''];
         }
 
         return $response;
@@ -320,6 +329,10 @@ class handler{
         $init = new apache();
 
         $action = $this->getAction($action, $init->getOptions()); // take user action and validate
+
+        if ($action === 'back') {
+            return ['status' => 3, 'message' => ''];
+        }
 
         //call the appropriate method according to user action
         switch ($action) {
