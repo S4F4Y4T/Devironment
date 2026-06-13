@@ -115,6 +115,15 @@ class handler{
         return ['status' => 1, 'message' => $this->version ?? "0.0.0"];
     }
 
+    private function hasUpdate(): bool
+    {
+        $latestRemoteCommit = shell_exec("git ls-remote $this->repository $this->branch");
+        $latestRemoteCommit = explode("\t", $latestRemoteCommit);
+        $localCommit = trim(shell_exec("git -C $this->projectDir rev-parse $this->branch"));
+
+        return ($latestRemoteCommit[0] ?? "") !== $localCommit;
+    }
+
     //validate if new update available
     public function status(): array
     {
@@ -122,16 +131,9 @@ class handler{
             return ['status' => 0, 'message' => "Script repository not found."];
         }
 
-        echo "Checking for new update...". PHP_EOL;
+        echo "Checking for new update..." . PHP_EOL;
 
-        // Get the latest commit SHA from the remote repository
-        $latestRemoteCommit = shell_exec("git ls-remote $this->repository $this->branch");
-        $latestRemoteCommit = explode("	", $latestRemoteCommit);
-
-        // Get the local commit SHA of the branch
-        $localCommit = trim(shell_exec("git -C $this->projectDir rev-parse $this->branch"));
-        
-        if (($latestRemoteCommit[0] ?? "") === $localCommit) {
+        if (!$this->hasUpdate()) {
             return ['status' => 1, 'message' => "Up to date! Nothing to update."];
         }
 
@@ -180,9 +182,9 @@ class handler{
             return ['status' => 0, 'message' => "Script repository not found."];
         }
         //validate if new update is available
-        if((int)($this->status()['status'] ?? 0) === 1)
+        if (!$this->hasUpdate())
         {
-            return ['status' => 0, 'message' => "Up to date! Nothing to update."];
+            return ['status' => 1, 'message' => "Up to date! Nothing to update."];
         }
         //validate if sudo privilege
         if((int)($this->sudo()['status'] ?? 0) === 0)
