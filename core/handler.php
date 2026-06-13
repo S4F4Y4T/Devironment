@@ -215,15 +215,16 @@ class handler{
 
         } elseif (strpos($gitPullOutput, 'Updating') !== false) {
 
-            // Bypass the "already installed" guard and redeploy updated files directly
-            ob_start();
-            require $this->projectDir . '/installer.php';
-            $installerOutput = get_object_vars(json_decode(ob_get_clean()));
+            // git pull already updated all files in the installed lib dir.
+            // Only the binary at /usr/local/bin/devenv needs redeploying.
+            $binarySrc  = $this->projectDir . '/bin/devenv.php';
+            $binaryDest = '/usr/local/bin/devenv';
 
-            if ((int)($installerOutput['status'] ?? 0) === 1) {
-                $response = ['status' => 1, 'message' => "Script updated to latest version successfully! Restart to make the changes."];
+            if (!copy($binarySrc, $binaryDest)) {
+                $response = ['status' => 0, 'message' => "Update applied but failed to redeploy binary."];
             } else {
-                $response = ['status' => 0, 'message' => $installerOutput['message'] ?? "Deployment failed."];
+                chmod($binaryDest, 0755);
+                $response = ['status' => 1, 'message' => "Script updated to latest version successfully! Restart to make the changes."];
             }
 
         } else {
@@ -418,7 +419,7 @@ class handler{
 
         $libDir = '/usr/local/lib/devironment';
         if (is_dir($libDir)) {
-            $result = shell_exec("rm -rf " . escapeshellarg($libDir) . " 2>&1");
+            shell_exec("rm -rf " . escapeshellarg($libDir) . " 2>&1");
             if (is_dir($libDir)) {
                 $errors[] = "Failed to remove $libDir";
             }
