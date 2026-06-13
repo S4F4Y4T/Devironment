@@ -197,30 +197,32 @@ class handler{
 
         echo "Initializing...". PHP_EOL;
 
+        // Discard any local changes so git pull never aborts on conflicts
+        shell_exec("git -C $this->projectDir reset --hard HEAD 2>&1");
+
         // Execute a `git pull` command to fetch and apply the latest changes from the remote repository
-        $gitPullOutput = shell_exec("git -C $this->projectDir pull $this->repository $this->branch");
+        $gitPullOutput = shell_exec("git -C $this->projectDir pull $this->repository $this->branch 2>&1");
 
         if (strpos($gitPullOutput, 'Already up to date') !== false) {
 
-            $response = ['message' => "Already up to date."];
+            $response = ['status' => 1, 'message' => "Already up to date."];
 
         } elseif (strpos($gitPullOutput, 'Updating') !== false) {
 
-            $installer = $this->installer(); //run installer
+            // Bypass the "already installed" guard and redeploy updated files directly
+            ob_start();
+            require $this->projectDir . '/installer.php';
+            $installerOutput = get_object_vars(json_decode(ob_get_clean()));
 
-            if((int)($installer['status'] ?? 0) === 1){
-
+            if ((int)($installerOutput['status'] ?? 0) === 1) {
                 $response = ['status' => 1, 'message' => "Script updated to latest version successfully! Restart to make the changes."];
-
-            }else{
-
-                $response = ['status' => 0, 'message' => $installer['message']];
-
+            } else {
+                $response = ['status' => 0, 'message' => $installerOutput['message'] ?? "Deployment failed."];
             }
 
-        }else{
+        } else {
 
-            $response = ['status' => 0, 'message' => "Something went wrong."];
+            $response = ['status' => 0, 'message' => "Something went wrong." . PHP_EOL . $gitPullOutput];
 
         }
 
