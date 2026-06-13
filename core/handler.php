@@ -296,6 +296,10 @@ class handler{
             case 'disable':
                 $response = $init->disable();
                 break;
+            case 5:
+            case 'remove':
+                $response = $init->remove();
+                break;
             default:
                 $response = ['message' => 'Invalid action'];
                 break;

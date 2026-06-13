@@ -27,10 +27,11 @@ class vhost
     public function getOptions(): array
     {
         return [
-            ['action-id' => 1, 'action' => 'create', 'label' => 'Create', 'description' => 'Create New Virtual Host'],
-            ['action-id' => 2, 'action' => 'list', 'label' => 'List', 'description' => 'List virtual hosts on your system'],
-            ['action-id' => 3, 'action' => 'enable', 'label' => 'Enable', 'description' => 'Enable a inactive host'],
-            ['action-id' => 4, 'action' => 'disable', 'label' => 'Disable', 'description' => 'Disable a active host']
+            ['action-id' => 1, 'action' => 'create',  'label' => 'Create',  'description' => 'Create New Virtual Host'],
+            ['action-id' => 2, 'action' => 'list',    'label' => 'List',    'description' => 'List virtual hosts on your system'],
+            ['action-id' => 3, 'action' => 'enable',  'label' => 'Enable',  'description' => 'Enable a inactive host'],
+            ['action-id' => 4, 'action' => 'disable', 'label' => 'Disable', 'description' => 'Disable a active host'],
+            ['action-id' => 5, 'action' => 'remove',  'label' => 'Remove',  'description' => 'Remove a virtual host permanently'],
         ];
     }
 
@@ -360,6 +361,48 @@ class vhost
         }
 
         return ['status' => $status ?? 1, 'message' => $message];
+    }
+
+    public function remove(): array
+    {
+        $this->inputDomain();
+        $this->validateDomainName();
+        $this->validateDomain();
+
+        $confAvailable = '/etc/apache2/sites-available/' . $this->domain . '.conf';
+        $confEnabled   = '/etc/apache2/sites-enabled/'   . $this->domain . '.conf';
+
+        try {
+            // Disable first if currently enabled
+            if (file_exists($confEnabled)) {
+                echo "Disabling site " . $this->domain . PHP_EOL;
+                shell_exec("a2dissite " . $this->domain . ".conf; systemctl restart apache2");
+            }
+
+            // Remove Apache config
+            if (!unlink($confAvailable)) {
+                throw new Exception("Failed to remove Apache config for " . $this->domain);
+            }
+
+            echo "Apache config removed" . PHP_EOL;
+
+            // Remove entry from /etc/hosts
+            $hosts = '/etc/hosts';
+            $lines = file($hosts, FILE_IGNORE_NEW_LINES);
+            $filtered = array_filter($lines, function ($line) {
+                return !preg_match('/\s+' . preg_quote($this->domain, '/') . '(\s|$)/', $line);
+            });
+            file_put_contents($hosts, implode(PHP_EOL, $filtered) . PHP_EOL);
+
+            echo "Host entry removed" . PHP_EOL;
+
+            $message = $this->domain . " has been removed successfully.";
+
+        } catch (Exception $e) {
+            return ['status' => 0, 'message' => "An error occurred: " . $e->getMessage()];
+        }
+
+        return ['status' => 1, 'message' => $message];
     }
 
 
